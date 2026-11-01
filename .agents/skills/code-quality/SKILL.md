@@ -175,7 +175,7 @@ Where a repository already has either key, add the one line to the end of its ar
 
 ### Local CI jobs
 
-Three jobs, one per tool, run before a pull request:
+Three jobs, one per tool, run before a pull request where remote CI does not run them (see *Before a pull request*):
 
 | Job | Command | Gated by |
 |---|---|---|
@@ -286,7 +286,9 @@ Never reformat vendor code, and never let the reformat commit include it: if Pin
 
 ## Before a pull request
 
-Run the three commands on the branch, and fix what they report before asking for review. The CI workflow runs them again on the pull request, and a reviewer should see that run's result for the commit under review.
+In a public repository whose CI workflow runs the three tools, that run on a draft pull request is the pre-PR check: run nothing locally first, open the pull request as a draft, fix what the workflow reports by pushing to the same branch, and flip it to ready once every remote check is green. The [`writing-pull-requests`](../writing-pull-requests/SKILL.md) skill's *Draft state and merge order* owns this and names the cases that still run locally. Where the tools have no remote run:
+
+Run the three commands on the branch, and fix what they report before asking for review.
 
 A finding you disagree with is argued in the configuration, with a reason, scoped as narrowly as the tool allows. Never a blanket suppression.
 
