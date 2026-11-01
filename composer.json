@@ -61,7 +61,7 @@
     "config": {
         "sort-packages": true,
         "platform": {
-            "php": "8.4.1"
+            "php": "8.4.27"
         },
         "allow-plugins": {
             "cweagans/composer-patches": true,
