@@ -1,5 +1,5 @@
 {
-    "name": "uams-web/statamic-redirects",
+    "name": "uams-web/aether-redirects",
     "description": "Redirect rules for Statamic: a redirects global set served on the 404 path, rules on redirect domains, an edge redirect manifest, and a marketing-redirect request and approval workflow.",
     "license": "MIT",
     "keywords": [
@@ -8,7 +8,7 @@
         "redirects"
     ],
     "type": "statamic-addon",
-    "homepage": "https://github.com/UAMS-Web/statamic-redirects",
+    "homepage": "https://github.com/UAMS-Web/aether-redirects",
     "authors": [
         {
             "name": "UAMS Web Services"
@@ -19,17 +19,17 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/UAMS-Web/statamic-redirects/issues",
-        "source": "https://github.com/UAMS-Web/statamic-redirects"
+        "issues": "https://github.com/UAMS-Web/aether-redirects/issues",
+        "source": "https://github.com/UAMS-Web/aether-redirects"
     },
     "autoload": {
         "psr-4": {
-            "UAMSWeb\\Redirects\\": "src/"
+            "UAMSWeb\\Aether\\Redirects\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "UAMSWeb\\Redirects\\Tests\\": "tests/"
+            "UAMSWeb\\Aether\\Redirects\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -39,7 +39,7 @@
         },
         "laravel": {
             "providers": [
-                "UAMSWeb\\Redirects\\ServiceProvider"
+                "UAMSWeb\\Aether\\Redirects\\ServiceProvider"
             ]
         },
         "composer-exit-on-patch-failure": true

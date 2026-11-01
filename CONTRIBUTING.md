@@ -1,4 +1,4 @@
-# Contributing to statamic-redirects
+# Contributing to aether-redirects
 
 <!-- uams-claude-skills:begin -->
 ## Branches and environments

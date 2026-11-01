@@ -8,11 +8,11 @@ declare(strict_types=1);
 |--------------------------------------------------------------------------
 |
 | Statamic merges this file into the application's config under the add-on's
-| handle (the package name without its vendor: `statamic-redirects`), so
-| `config('statamic-redirects.some_key')` reads it. The host publishes it
+| handle (the package name without its vendor: `aether-redirects`), so
+| `config('aether-redirects.some_key')` reads it. The host publishes it
 | to its own `config/` directory with:
 |
-|     php artisan vendor:publish --tag=statamic-redirects-config
+|     php artisan vendor:publish --tag=aether-redirects-config
 |
 | Rename this file to `config/<handle>.php` when the package is renamed. Delete
 | it, and the config test in `tests/Integration/ServiceProviderTest.php`, if the

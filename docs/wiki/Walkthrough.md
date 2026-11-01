@@ -2,7 +2,7 @@ Written against v0.0.0.
 
 By the end of this page you will have <what the reader will have>. Replace this sentence with it, then the steps below.
 
-It assumes the add-on is installed (see [Installation (README)](https://github.com/UAMS-Web/statamic-redirects#installation)) in <the setup the reader needs>.
+It assumes the add-on is installed (see [Installation (README)](https://github.com/UAMS-Web/aether-redirects#installation)) in <the setup the reader needs>.
 
 ## 1. <An action>
 
