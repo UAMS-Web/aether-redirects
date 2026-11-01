@@ -11,6 +11,6 @@
 
 declare(strict_types=1);
 
-use UAMSWeb\Redirects\Tests\TestCase;
+use UAMSWeb\Aether\Redirects\Tests\TestCase;
 
 pest()->extend(TestCase::class)->in('Integration');

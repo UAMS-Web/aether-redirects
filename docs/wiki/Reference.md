@@ -9,7 +9,7 @@ Written against v0.0.0.
 ## Example
 
 ```php
-// config/statamic-redirects.php
+// config/aether-redirects.php
 return [
     'some_key' => 'value',
 ];

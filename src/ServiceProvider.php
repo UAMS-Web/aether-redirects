@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace UAMSWeb\Redirects;
+namespace UAMSWeb\Aether\Redirects;
 
 use Statamic\Providers\AddonServiceProvider;
 

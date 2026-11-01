@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Statamic\Facades\Addon;
-use UAMSWeb\Redirects\ServiceProvider;
+use UAMSWeb\Aether\Redirects\ServiceProvider;
 
 /**
  * The add-on boots inside a minimal Statamic.
@@ -12,14 +12,14 @@ use UAMSWeb\Redirects\ServiceProvider;
  */
 it('is discovered by Statamic as an add-on', function (): void {
     // Expect the add-on among those Statamic booted
-    expect(Addon::all()->map->package()->all())->toContain('uams-web/statamic-redirects');
+    expect(Addon::all()->map->package()->all())->toContain('uams-web/aether-redirects');
 });
 
 it('publishes its config file under the tag the README names', function (): void {
     // Read the paths published under the config tag
-    $paths = ServiceProvider::pathsToPublish(null, 'statamic-redirects-config');
+    $paths = ServiceProvider::pathsToPublish(null, 'aether-redirects-config');
 
     // Expect the package config to publish to the app's config directory
-    expect(array_map(realpath(...), array_keys($paths)))->toBe([realpath(__DIR__.'/../../config/statamic-redirects.php')])
-        ->and(array_values($paths))->toBe([config_path('statamic-redirects.php')]);
+    expect(array_map(realpath(...), array_keys($paths)))->toBe([realpath(__DIR__.'/../../config/aether-redirects.php')])
+        ->and(array_values($paths))->toBe([config_path('aether-redirects.php')]);
 });

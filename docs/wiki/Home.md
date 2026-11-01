@@ -1,12 +1,12 @@
 Replace this paragraph with what the add-on does and who it is for.
 
-This wiki holds the documentation: a walkthrough, task guides by role, the reference, and troubleshooting. The [README](https://github.com/UAMS-Web/statamic-redirects#readme) keeps an overview, the requirements and installation.
+This wiki holds the documentation: a walkthrough, task guides by role, the reference, and troubleshooting. The [README](https://github.com/UAMS-Web/aether-redirects#readme) keeps an overview, the requirements and installation.
 
 The pages in this folder are skeletons, one per page shape the `github-wiki` skill describes. Copy each, fill it in, rename it for its subject, and keep Home, the sidebar and the footer listing the same pages under the same labels.
 
 ## Getting started
 
-- [Installation (README)](https://github.com/UAMS-Web/statamic-redirects#installation): add the package to a Statamic install.
+- [Installation (README)](https://github.com/UAMS-Web/aether-redirects#installation): add the package to a Statamic install.
 - [Walkthrough](Walkthrough.md): a first use of the add-on, from nothing to a visible result.
 
 ## Guides

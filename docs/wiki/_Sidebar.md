@@ -2,7 +2,7 @@
 
 **Getting started**
 
-- [Installation (README)](https://github.com/UAMS-Web/statamic-redirects#installation)
+- [Installation (README)](https://github.com/UAMS-Web/aether-redirects#installation)
 - [Walkthrough](Walkthrough.md)
 
 **Guides**
@@ -16,10 +16,10 @@
 **Reference**
 
 - [Reference](Reference.md)
-- [README](https://github.com/UAMS-Web/statamic-redirects#readme)
+- [README](https://github.com/UAMS-Web/aether-redirects#readme)
 
 **Project**
 
 - [Project](Project.md)
-- [Report a problem](https://github.com/UAMS-Web/statamic-redirects/issues)
-- [Releases](https://github.com/UAMS-Web/statamic-redirects/releases)
+- [Report a problem](https://github.com/UAMS-Web/aether-redirects/issues)
+- [Releases](https://github.com/UAMS-Web/aether-redirects/releases)

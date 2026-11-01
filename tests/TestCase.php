@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace UAMSWeb\Redirects\Tests;
+namespace UAMSWeb\Aether\Redirects\Tests;
 
 use Illuminate\Foundation\Application;
 use Statamic\Testing\AddonTestCase;
-use UAMSWeb\Redirects\ServiceProvider;
+use UAMSWeb\Aether\Redirects\ServiceProvider;
 
 /**
  * Base class for the Integration suite: boots a minimal Statamic through

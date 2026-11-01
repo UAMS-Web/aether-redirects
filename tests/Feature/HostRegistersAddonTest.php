@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace UAMSWeb\Redirects\Tests\Feature;
+namespace UAMSWeb\Aether\Redirects\Tests\Feature;
 
 use Statamic\Facades\Addon;
 use Tests\TestCase;
-use UAMSWeb\Redirects\ServiceProvider;
+use UAMSWeb\Aether\Redirects\ServiceProvider;
 
 /**
  * Host-bound smoke test: the add-on is discovered and booted by a real Statamic
@@ -18,7 +18,7 @@ use UAMSWeb\Redirects\ServiceProvider;
  * from the root of the host described in `docs/DEVELOPMENT.md`, with the add-on
  * installed through a path repository.
  *
- * @command  php artisan test vendor/uams-web/statamic-redirects/tests/Feature/HostRegistersAddonTest.php
+ * @command  php artisan test vendor/uams-web/aether-redirects/tests/Feature/HostRegistersAddonTest.php
  */
 final class HostRegistersAddonTest extends TestCase
 {
@@ -32,7 +32,7 @@ final class HostRegistersAddonTest extends TestCase
         $packages = Addon::all()->map->package()->all();
 
         // Expect this add-on among them
-        $this->assertContains('uams-web/statamic-redirects', $packages);
+        $this->assertContains('uams-web/aether-redirects', $packages);
     }
 
     /** The add-on's service provider was registered and booted by the host. */
