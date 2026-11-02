@@ -80,7 +80,7 @@ Run `vendor/bin/pest --mutate --class="<Namespace>\\…\\<ChangedClass>"` diff-s
 
 **Annotate with `// @pest-mutate-ignore: <Mutator>`**, never config `ignore()`/`except()`: standalone **above** the node, reason on its own line before it, **nothing after the mutator names** (prose suppresses nothing), never **bare** (suppresses the whole subtree), no **trailing whitespace**. Run [`check-mutate-ignore.php`](../pest-testing/scripts/check-mutate-ignore.php) as a CI job (the `code-quality` template has one); clean means no annotation is inert, never that every one is effective.
 
-**Every run must show it executed** (a child that never launched scores a kill, so a dead run reads `100.00%`): any survivor; at 100%, a mutation-to-base `Duration:` ratio an order of magnitude below 1 is the failure (failures 0.03 to 0.08, healthy 0.64 to 4.67), near 1 re-run; implausible perfection; else run one child by hand with the run's own test selection:
+**Every run must show it executed** (a child that never launched scores a kill, so a dead run reads `100.00%`): any survivor; at 100%, a mutation-to-base `Duration:` ratio an order of magnitude below 1 is the failure (failures 0.03 to 0.08, healthy 0.64 to 4.67), near 1 re-run, but only once the base phase is shown to be test time (compare it with the tests run without `--mutate`; a padded base phase voids the ratio, and a low ratio is never waved off as padding without that comparison: [evidence](../evidence-behind-rules/adversarial-review.md)); implausible perfection; else run one child by hand with the run's own test selection:
 
 ```
 PEST_MUTATION_TESTING=<absolute source path> PEST_MUTATION_FILE=<replacement> vendor/bin/pest <test file> --bail --filter="<Class>::(.*)"

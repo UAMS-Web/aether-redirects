@@ -41,7 +41,7 @@ A repository develops and tests on one PHP, and that is not the oldest PHP it su
 
 **The floor in every WordPress repository is PHP 8.2**, the oldest PHP any UAMS WordPress site runs, with no per-repository exception (UAMS-Web/uams-claude-skills#126). A WordPress repository whose header or `composer.json` names a lower floor raises it to 8.2 when it adopts this standard.
 
-**Every WordPress repository develops on PHP 8.4.1 and runs Pest 5.** `config.platform.php` is `8.4.1`, because every PHPUnit 13 release, which Pest 5.3 requires, needs `php >=8.4.1`; the pin also keeps Composer from resolving for a newer PHP than a teammate has. `local-ci.json`'s `php` is `8.4`. Any PHP 8.4.1 or newer installs and runs the suite.
+**Every WordPress repository develops on the latest PHP 8.4 patch, 8.4.27 today, and runs Pest 5.** `config.platform.php` is `8.4.27`, and it is raised on each 8.4 security release, here and in each repository's `composer.json` and lock (UAMS-Web/uams-claude-skills#394). It can never go below 8.4.1, because every PHPUnit 13 release, which Pest 5.3 requires, needs `php >=8.4.1`. The pin also keeps Composer from resolving for a newer PHP than a teammate has. `local-ci.json`'s `php` is `8.4`, and the local CI runner refuses, before any job, a PHP older than `config.platform.php`; a job with a `php` of its own, such as the floor lint, is not held to it.
 
 Outside WordPress, the development PHP is the one the repository's servers and developers run, never below the floor; a Laravel or Statamic application usually has one PHP for both. Choose the newest Pest major that PHP allows (repo.packagist.org, 2026-10-07):
 
