@@ -252,7 +252,7 @@ Run the suite on the PHP version production runs. That is not a substitute for `
 
 **Decision: ship C and D, keep A, B and E with the application.** The shipped script carries a test per rule, a negative case for each neighboring shape it must leave alone, and a clean control. Each rule was also exercised against a real tree: the script read all 1,137 files of the `uams-statamic` suite at the commit above with no finding, then reported both rules on a copy with one duplicate function and one no-op import planted.
 
-Of the three consumers, only `uams-statamic` runs `--parallel` (`wordpress-importer` and `uamswp-migration-api` run their suites serially), so the shared script has one parallel consumer today. Adopting it there means replacing rules C and D in its private guard, which is that repository's change. Revisit the split when a second repository adopts `--parallel` and meets a shared-state defect that Rule A or B would have caught outside Laravel.
+Of the three consumers, only `uams-statamic` runs `--parallel` (`aether-wordpress-importer` and `aether-wordpress-migration-api` run their suites serially), so the shared script has one parallel consumer today. Adopting it there means replacing rules C and D in its private guard, which is that repository's change. Revisit the split when a second repository adopts `--parallel` and meets a shared-state defect that Rule A or B would have caught outside Laravel.
 
 ## Mutation testing
 
@@ -341,11 +341,37 @@ The baseline is a JSON file the repository keeps (the example path above is a co
 - **The seconds ceiling is the backstop.** It catches growth that hits every class at once, such as a per-test boot cost, which moves no share. Set it several times above the worst quiet reading so load alone does not reach it.
 - **The defaults are loose starting points, not measurements of any suite.** Measure the costliest class's share and time on several quiet and several busy runs, then set the share ceiling a margin above the worst share observed and below 100 divided by the workers, and pass both as flags from the CI step so the numbers sit beside the command that uses them.
 - **A serial run needs a looser share ceiling.** A load spike confined to the window where the costliest class runs is not cancelled by a ratio, and a serial run has one class per window.
+- **A small suite needs `--share-ceiling=100`.** With few classes, one class takes a large share whatever its size (at least 100 divided by the class count), and in a suite of a few seconds the wall time it bounds is too small to be worth splitting for. `UAMS-Web/statamic-redirects`, with 24 tests over 0.3 seconds, had one class at 72 percent, so the default 25 failed a run with nothing to fix (UAMS-Web/statamic-redirects#9). Set the share ceiling to 100 there, which leaves only the backstop (a suite of one class passes at 100 too), and lower it once the suite runs long enough for its costliest class to cost real wall time.
 - When it fails, split the class rather than raising a ceiling.
 
 ### What is not generalized
 
 The per-band measured ceilings, the backstop values and the skip counts that came with the original scripts describe one application's suite and are not shipped. Each repository records its own: the baseline file for the skip counts, and the flag values in its CI step for the cost thresholds.
+## Changed tests against base
+
+[`scripts/changed-tests-against-base.mjs`](scripts/changed-tests-against-base.mjs) answers the question a coverage or bug-fix pull request leaves open: do the tests it adds or changes already pass against the source as it was? The pull request's own run cannot say, because it runs the new tests against the new source (UAMS-Web/uams-claude-skills#357, #391).
+
+It builds a scratch git worktree of the pull request, outside the checkout, and reverts every change the pull request makes outside `tests/` to the base branch's version. Then it installs dependencies there, runs only the changed test files, and reports each one:
+
+| Report | Meaning |
+| --- | --- |
+| passed | the behavior the test describes was already true on the base |
+| failed | the base behaves differently, which a bug fix is expected to show; the failing cases are named, and the pull request body says which failures are expected |
+| needs the pull request's source | every failure is a class, method, function, interface, trait, enum or constant the base does not have **and the pull request's changed source declares**, so the test calls something the pull request added; this is not a behavior change. A missing symbol the pull request does not declare, such as a typo'd call the pull request fixes, is reported as failed |
+| skipped | every case skipped or marked todo, so nothing was compared; skipped cases are never counted as passing |
+| did not run | the file aborted against the base for another reason, and the job fails |
+
+- **It reports and never gates.** A failure against the base is information for the reviewer, so the job succeeds once the report exists. It fails only when it cannot do the comparison: the base does not resolve, the scratch tree cannot be built or installed, the runner writes no results, or a test file did not run.
+- **The test side is laid over the base whole.** Changed support files under `tests/` (`tests/Pest.php`, fixtures, helpers) keep the pull request's version beside the changed tests, because they are part of what the tests say: a helper a new test calls is not a behavior of the source. The report lists every support file laid over and every source file left at base, so a reader can see where the line was drawn.
+- **Dependencies are installed in the scratch tree** (`composer install` by default; `--install <command>` or `--install none`), never linked from the checkout. A linked `vendor/` makes Pest load the donor tree's bootstrap, the trap the `worktrees` rule describes.
+- **Cases are attributed by the file Pest records on each case**, so `describe` blocks and datasets, which Pest logs in nested suites without a `file`, count toward their file. A class-based file is matched by the class it declares.
+- **A run that is interrupted** (SIGINT or SIGTERM) removes its scratch worktree before exiting; a SIGKILL cannot be caught, and `git worktree prune` clears what one leaves.
+- **The base** is `--base <ref>`, else `origin/$GITHUB_BASE_REF` on a pull request in Actions, else `origin/main`. The comparison is against the merge base of that ref and `HEAD`. A push or any other Actions event is reported as nothing to compare.
+
+How to wire it into `ci.yml` and `local-ci.json` is in the `code-quality` skill, *Adding the changed-tests report*.
+
+Measured on macOS (Darwin 27.2.0) with PHP 8.4.27 and Pest 4.7.8, on a branch that planted a behavior change. A test describing the new behavior was reported failed against the base and passed against the branch. A test calling a method the branch added was reported as needing its source. A test of unchanged behavior passed. The run exited 0 and left the checkout unchanged. Windows is covered by the script's tests only.
+
 ## Common Pitfalls
 
 - Deleting tests without approval.
