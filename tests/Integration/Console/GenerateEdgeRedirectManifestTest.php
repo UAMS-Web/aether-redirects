@@ -5,13 +5,19 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Assert;
+use Statamic\Contracts\Globals\GlobalSet as GlobalSetContract;
 use Statamic\Entries\Collection as StatamicCollection;
 use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Facades\Blueprint as BlueprintFacade;
 use Statamic\Facades\Entry;
 use Statamic\Facades\Fieldset;
+use Statamic\Facades\GlobalSet;
+use Statamic\Facades\Site;
 use Statamic\Facades\Stache;
+use Statamic\Globals\GlobalSet as StatamicGlobalSet;
+use Statamic\Globals\Variables;
 use Statamic\Stache\Stores\CollectionsStore;
+use UAMSWeb\Aether\Redirects\Services\EdgeRedirectManifestBuilder;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 use UAMSWeb\Aether\Redirects\Tests\Support\StacheIsolation;
@@ -233,4 +239,114 @@ it('fails, naming the file, when it cannot write one host of every host', functi
         ->and($output)->toContain('Could not write ['.edgeManifestDirectory().'/agec.org.json].')
         ->and($output)->not->toContain('Wrote')
         ->and(File::exists(edgeManifestDirectory().'/uams.flu.json'))->toBeFalse();
+});
+
+/**
+ * Save the `redirects` global set with the given rules on each site.
+ *
+ * @param  array<string, list<array<string, mixed>>>  $rulesBySite  The rules, by site handle.
+ */
+function commandGlobalSet(array $rulesBySite): GlobalSetContract
+{
+    $global = GlobalSet::make('redirects');
+    Assert::assertInstanceOf(StatamicGlobalSet::class, $global);
+
+    $global->sites(array_keys($rulesBySite));
+    $global->save();
+
+    foreach ($rulesBySite as $site => $rules) {
+        $variables = $global->makeLocalization($site);
+        Assert::assertInstanceOf(Variables::class, $variables);
+        $variables->data(['redirects' => $rules]);
+        $variables->save();
+    }
+
+    return $global;
+}
+
+/**
+ * A redirect rule from the global set, sending a source to a fixed URL.
+ *
+ * @param  string  $source  The rule's source.
+ * @return array<string, mixed> The rule.
+ */
+function commandGlobalRule(string $source): array
+{
+    return ['source' => $source, 'target_type' => 'url', 'target_url' => 'https://uams.edu/to', 'response' => '301', 'enabled' => true];
+}
+
+it('refuses a site the application does not know, before reading any global set', function (): void {
+    commandGlobalSet(['default' => [commandGlobalRule('/a')]]);
+
+    [$code, $output] = runEdgeManifest(['site' => 'nowhere']);
+
+    expect($code)->toBe(1)
+        ->and($output)->toContain('Unknown site [nowhere].')
+        ->and($output)->not->toContain('"version"');
+});
+
+it('refuses a global set that does not exist', function (): void {
+    commandGlobalSet(['default' => [commandGlobalRule('/a')]]);
+
+    [$code, $output] = runEdgeManifest(['site' => 'default', '--global' => 'missing']);
+
+    expect($code)->toBe(1)
+        ->and(trim($output))->toBe('Unknown global set [missing].');
+});
+
+it("prints a site's manifest as pretty-printed JSON with unescaped slashes and a final newline", function (array $arguments): void {
+    /** @var array<string, mixed> $arguments */
+    $global = commandGlobalSet(['default' => [commandGlobalRule('/a')]]);
+
+    [$code, $output] = runEdgeManifest(['site' => 'default', ...$arguments]);
+
+    $manifest = app(EdgeRedirectManifestBuilder::class)->forSite($global, 'default', 'default');
+
+    expect($code)->toBe(0)
+        ->and($output)->toBe(json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n")
+        ->and($output)->toContain('"https://uams.edu/to"');
+})->with([
+    'no output path' => [[]],
+    'an empty output path' => [['--output' => '']],
+]);
+
+it("merges the default site's rules beneath a site's own", function (): void {
+    config()->set('statamic.system.multisite', true);
+    Site::setSites([
+        'default' => ['name' => 'Enterprise', 'url' => '/', 'locale' => 'en_US'],
+        'news' => ['name' => 'News', 'url' => '/news/', 'locale' => 'en_US'],
+    ]);
+    commandGlobalSet(['default' => [commandGlobalRule('/shared')], 'news' => [commandGlobalRule('/own')]]);
+
+    [$code, $output] = runEdgeManifest(['site' => 'news']);
+
+    /** @var array{site: string, exact: list<array<string, mixed>>} $manifest */
+    $manifest = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+    expect($code)->toBe(0)
+        ->and($manifest['site'])->toBe('news')
+        ->and(array_column($manifest['exact'], 'source'))->toBe(['/own', '/shared']);
+});
+
+it("writes a site's manifest to a file, and names the site and the file", function (): void {
+    commandGlobalSet(['default' => [commandGlobalRule('/a')]]);
+    File::ensureDirectoryExists(edgeManifestDirectory());
+    $file = edgeManifestDirectory().'/default.json';
+
+    [$code, $output] = runEdgeManifest(['site' => 'default', '--output' => $file]);
+
+    expect($code)->toBe(0)
+        ->and(File::get($file))->toEndWith("}\n")
+        ->and(trim($output))->toBe("Wrote the edge redirect manifest for [default] to [{$file}].");
+});
+
+it("fails, naming the file, when it cannot write a site's manifest", function (): void {
+    commandGlobalSet(['default' => [commandGlobalRule('/a')]]);
+    File::ensureDirectoryExists(edgeManifestDirectory().'/default.json');
+    $file = edgeManifestDirectory().'/default.json';
+
+    [$code, $output] = runEdgeManifestUnwarned(['site' => 'default', '--output' => $file]);
+
+    expect($code)->toBe(1)
+        ->and(trim($output))->toBe("Could not write [{$file}].");
 });

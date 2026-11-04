@@ -88,6 +88,10 @@ class GenerateEdgeRedirectManifest extends Command
 
         // Build it, merging the default site's rules beneath as the serving tag does
         $default = Site::default();
+
+        // Statamic always configures a site, so the default is always one; the check
+        // narrows the facade's return type for static analysis
+        // @pest-mutate-ignore:InstanceOfToTrue
         $defaultHandle = $default instanceof SiteModel ? $default->handle() : null;
         $defaultHandle = is_string($defaultHandle) ? $defaultHandle : null;
 
