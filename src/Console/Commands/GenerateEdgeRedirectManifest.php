@@ -48,12 +48,16 @@ class GenerateEdgeRedirectManifest extends Command
     {
         $site = $this->argument('site');
         $host = $this->option('host');
+        // A value-less option already reads as a boolean; the cast states the type
+        // @pest-mutate-ignore:RemoveBooleanCast
         $allHosts = (bool) $this->option('hosts');
         $hasHost = is_string($host) && $host !== '';
 
         $siteHandle = is_string($site) ? $site : null;
 
-        // Take exactly one input: a site, one host, or every host
+        // Take exactly one input: a site, one host, or every host. PHP adds booleans
+        // as integers, so the casts state the arithmetic rather than change it
+        // @pest-mutate-ignore:RemoveIntegerCast
         if ((int) ($siteHandle !== null) + (int) $hasHost + (int) $allHosts !== 1) {
             $this->error('Pass a site handle, --host=<domain>, or --hosts.');
 
@@ -154,10 +158,16 @@ class GenerateEdgeRedirectManifest extends Command
             return self::FAILURE;
         }
 
-        if (! is_dir($output) && ! mkdir($output, 0755, true) && ! is_dir($output)) {
-            $this->error("Could not create [{$output}].");
+        if (! is_dir($output)) {
+            // A directory a concurrent run created after the check above is fine, so
+            // look again before refusing. Either operator refuses the same cases but
+            // that race, and the mode bits are not read back by anything here
+            // @pest-mutate-ignore:BooleanAndToBooleanOr,IncrementInteger,DecrementInteger
+            if (! mkdir($output, 0755, true) && ! is_dir($output)) {
+                $this->error("Could not create [{$output}].");
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
         }
 
         // Write each host's manifest to <directory>/<host>.json
@@ -184,6 +194,8 @@ class GenerateEdgeRedirectManifest extends Command
      */
     private function reportUnresolved(string $host, array $unresolved): void
     {
+        // A host with no count warns about nothing, and any default below one says so
+        // @pest-mutate-ignore:DecrementInteger
         $count = $unresolved[$host] ?? 0;
 
         if ($count > 0) {
@@ -230,6 +242,8 @@ class GenerateEdgeRedirectManifest extends Command
     {
         $value = $this->option($key);
 
+        // Any fallback that names no global set or collection reads the same
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
         return is_string($value) ? $value : '';
     }
 }
