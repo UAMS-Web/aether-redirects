@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UAMSWeb\Aether\Redirects\Tests\Support;
 
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 use Statamic\Facades\Blink;
 use Statamic\Facades\Blueprint;
 use Statamic\Facades\Fieldset;
@@ -46,6 +47,9 @@ final class StacheIsolation
         $root = storage_path('framework/testing/isolated-stache/'.self::segment(getenv('TEST_TOKEN')));
         File::deleteDirectory($root);
 
+        // Create it now, so the stores only ever create directories inside it
+        self::ensureDirectory($root);
+
         $isolation = new self($root, Blueprint::directory(), Fieldset::directory());
 
         // Point every store at its own directory under the throwaway root
@@ -74,6 +78,30 @@ final class StacheIsolation
         Fieldset::setDirectory($this->originalFieldsetDirectory);
         File::deleteDirectory($this->root);
         Stache::clear();
+    }
+
+    /**
+     * Create a directory whose parents other workers may be creating at the same
+     * time. A recursive `mkdir()` warns `File exists` when another process creates
+     * one of the parents between its check and its own create, and the test
+     * harness turns that warning into a failure, so this ignores the warning and
+     * retries until the directory exists.
+     *
+     * @param  string  $path  The directory to create.
+     *
+     * @throws RuntimeException When the directory still does not exist.
+     */
+    public static function ensureDirectory(string $path): void
+    {
+        // Each attempt creates whatever a concurrent worker has not already created
+        for ($attempt = 0; $attempt < 3 && ! is_dir($path); $attempt++) {
+            @mkdir($path, 0755, true);
+            clearstatcache(true, $path);
+        }
+
+        if (! is_dir($path)) {
+            throw new RuntimeException("Could not create [{$path}].");
+        }
     }
 
     /**

@@ -53,6 +53,9 @@ beforeEach(function (): void {
     $collection->save();
 
     File::deleteDirectory(edgeManifestDirectory());
+
+    // Create the directory every worker writes under before any test writes into it
+    StacheIsolation::ensureDirectory(dirname(edgeManifestDirectory()));
 });
 
 afterEach(function (): void {

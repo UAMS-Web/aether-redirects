@@ -379,6 +379,7 @@ it("writes one manifest per host, each carrying only that host's rules", functio
 
     $directory = storage_path('framework/testing/redirect-domain-manifests/'.StacheIsolation::segment(getenv('TEST_TOKEN')));
     File::deleteDirectory($directory);
+    StacheIsolation::ensureDirectory(dirname($directory));
 
     try {
         expect(Artisan::call('redirects:edge-manifest', ['--hosts' => true, '--output' => $directory]))->toBe(0)
