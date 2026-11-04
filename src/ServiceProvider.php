@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace UAMSWeb\Aether\Redirects;
 
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Statamic\Providers\AddonServiceProvider;
+use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 
 /**
  * Service provider for the add-on.
@@ -33,9 +35,17 @@ class ServiceProvider extends AddonServiceProvider
 
     /**
      * Boot the add-on once Statamic has booted.
+     *
+     * Registers the middleware that answers the redirect domains' requests. The
+     * host owns the `redirect_domains` collection, its config and its blueprint.
      */
     public function bootAddon(): void
     {
-        // Register the add-on's behavior here
+        // Answer a redirect domain's request on the global stack, after the host's own
+        // global middleware, so it runs before routing and never reaches Statamic's
+        // catch-all route
+        // Every Laravel HTTP kernel extends the framework's, which has pushMiddleware()
+        $kernel = $this->app->make(HttpKernel::class);
+        $kernel->pushMiddleware(ServeRedirectDomainRequests::class);
     }
 }

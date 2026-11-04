@@ -8,8 +8,8 @@ use Statamic\Facades\Blueprint;
 use Statamic\Facades\GlobalSet;
 use Statamic\Facades\Site;
 use Statamic\Globals\Variables;
-use Statamic\Testing\Concerns\PreventsSavingStacheItemsToDisk;
 use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
+use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 
 /**
  * End-to-end multisite serving of the shared (non-localizable) redirects list
@@ -30,7 +30,7 @@ use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
  *
  * @command  vendor/bin/pest tests/Integration/Tags/FindRedirectRuleMultisiteTest.php
  */
-uses(PreventsSavingStacheItemsToDisk::class);
+uses(IsolatesStache::class);
 
 beforeEach(function (): void {
     config()->set('statamic.system.multisite', true);

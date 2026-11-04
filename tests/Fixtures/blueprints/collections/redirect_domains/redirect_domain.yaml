@@ -1,0 +1,169 @@
+title: 'Redirect Domain'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Redirect
+        instructions: 'A redirect served at the edge for a domain that is not a Statamic site. Requests to these domains never reach Statamic, so a rule here takes effect when the edge redirect manifests are next generated.'
+        fields:
+          -
+            handle: host
+            field:
+              type: text
+              display: Domain
+              instructions: 'The domain this rule answers on, without `https://` or a path. For example: `agec.org`.'
+              placeholder: example.org
+              validate:
+                - required
+                - 'regex:/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/i'
+              listable: true
+              filterable: true
+              width: 66
+          -
+            handle: enabled
+            field:
+              type: toggle
+              display: Enabled
+              instructions: 'Off means this rule is left out of the manifest.'
+              default: true
+              listable: true
+              width: 33
+          -
+            handle: whole_domain
+            field:
+              type: toggle
+              display: 'Whole Domain'
+              instructions: 'On sends every path on the domain to the one target, with nothing appended.'
+              default: false
+              listable: true
+              filterable: true
+              width: 33
+          -
+            handle: source
+            field:
+              type: text
+              display: 'Source URL (Redirect From)'
+              instructions: |-
+                A path on the domain. For example: `/my-old-url`.
+
+                Appending a `*` wildcard character will match all requests with the base.
+
+                Warning: Enabling regular expressions will disable wildcards and completely change the way the `*` symbol is interpreted.
+              placeholder: /old-url
+              validate:
+                - required
+                - sometimes
+              listable: true
+              width: 66
+              instructions_position: below
+              if:
+                whole_domain: 'equals false'
+          -
+            handle: use_regex
+            field:
+              type: toggle
+              display: 'Use Regular Expressions?'
+              instructions: 'A regular expression cannot be served at the edge, so the rule is left out of the manifest and counted there.'
+              listable: false
+              width: 33
+              if:
+                whole_domain: 'equals false'
+          -
+            handle: target_type
+            field:
+              type: radio
+              display: 'Target Type'
+              options:
+                -
+                  key: entry
+                  value: 'Statamic Entry'
+                -
+                  key: url
+                  value: 'Explicit URL'
+              default: url
+              inline: true
+              validate:
+                - required
+              listable: false
+          -
+            handle: target_entry
+            field:
+              type: entries
+              display: 'Target Entry (Redirect To)'
+              instructions: 'The entry''s URL is read each time the manifests are generated, so the redirect follows the entry when it moves.'
+              max_items: 1
+              validate:
+                - required
+                - sometimes
+              listable: false
+              width: 50
+              if:
+                target_type: 'equals entry'
+          -
+            handle: target_query_string
+            field:
+              type: text
+              display: 'Query String'
+              prepend: '?'
+              listable: false
+              width: 50
+              if:
+                target_type: 'equals entry'
+          -
+            handle: target_url
+            field: uamsweb_common.url
+            config:
+              display: 'Target URL (Redirect To)'
+              instructions: 'Use an absolute URL, such as `https://uams.edu/page`. Outside a whole-domain rule, ending with a `*` wildcard character will append the request match to the redirect.'
+              placeholder: 'https://'
+              validate:
+                - required
+                - sometimes
+              listable: true
+              width: 100
+              if:
+                target_type: 'equals url'
+          -
+            handle: response
+            field:
+              type: radio
+              display: 'HTTP Response Code'
+              instructions: 'You should almost always use `301 Moved Permanently`.'
+              options:
+                -
+                  key: '301'
+                  value: '301 Moved Permanently'
+                -
+                  key: '302'
+                  value: '302 Found'
+                -
+                  key: '303'
+                  value: '303 See Other'
+                -
+                  key: '307'
+                  value: '307 Temporary Redirect'
+                -
+                  key: '308'
+                  value: '308 Permanent Redirect'
+              default: '301'
+              listable: false
+              width: 50
+          -
+            handle: order
+            field:
+              type: integer
+              display: Order
+              instructions: 'Rules for a domain are tried in ascending order, and the first match wins. Rules with the same order are tried in alphabetical order of their titles. Use `30` for most page-specific rules, and a higher value for a wildcard that should be tried after them.'
+              default: '30'
+              listable: false
+              width: 50
+              if:
+                whole_domain: 'equals false'
+          -
+            handle: notes
+            field:
+              type: textarea
+              display: Notes
+              instructions: 'Optional. Why this redirect exists, or who asked for it.'
+              listable: false
