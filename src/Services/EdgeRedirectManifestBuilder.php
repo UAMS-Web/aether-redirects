@@ -104,7 +104,7 @@ final readonly class EdgeRedirectManifestBuilder
      * @param  GlobalSetContract  $global  The redirects global set.
      * @param  string  $siteHandle  The site the manifest is for.
      * @param  string|null  $defaultSiteHandle  The default site, whose rules merge beneath, or null.
-     * @return array<string, mixed> The manifest.
+     * @return array{version: int, site: string, semantics: array<string, string>, reserved_prefixes: list<string>, exact: list<array<string, mixed>>, prefix: list<array<string, mixed>>, prefix_complete: bool, withheld: array<string, int>} The manifest.
      */
     public function forSite(
         GlobalSetContract $global,
@@ -127,7 +127,7 @@ final readonly class EdgeRedirectManifestBuilder
      *
      * @param  string  $host  The domain the manifest is for.
      * @param  array<int, array<string, mixed>>  $rules  The host's rules, as `RedirectDomainRules` reads them.
-     * @return array<string, mixed> The manifest.
+     * @return array{version: int, host: string, semantics: array<string, string>, reserved_prefixes: list<string>, exact: list<array<string, mixed>>, prefix: list<array<string, mixed>>, prefix_complete: bool, withheld: array<string, int>} The manifest.
      */
     public function forHost(string $host, array $rules): array
     {
@@ -146,7 +146,7 @@ final readonly class EdgeRedirectManifestBuilder
      * @param  array<int, array<string, mixed>>  $rules  The site's rules, as `rulesForSite()` returns them.
      * @param  string  $siteHandle  The site the manifest is for.
      * @param  list<string>  $reservedPrefixes  Paths the application routes itself, which no rule may claim.
-     * @return array<string, mixed> The manifest.
+     * @return array{version: int, site: string, semantics: array<string, string>, reserved_prefixes: list<string>, exact: list<array<string, mixed>>, prefix: list<array<string, mixed>>, prefix_complete: bool, withheld: array<string, int>} The manifest.
      */
     public function build(
         array $rules,
