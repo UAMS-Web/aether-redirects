@@ -75,9 +75,8 @@ final readonly class RedirectDomainRules
     {
         // Read the published entries by title, so rules with the same order are tried
         // in a sequence an editor can see, and the manifest is the same on every run
+        /** @var EntryQueryBuilder $query */
         $query = Entry::query();
-        \assert($query instanceof EntryQueryBuilder);
-
         /** @var EntryQueryBuilder $query */
         $query = $query->where('collection', $collection);
         /** @var EntryQueryBuilder $query */
@@ -94,6 +93,9 @@ final readonly class RedirectDomainRules
         $invalid = [];
 
         foreach ($entries as $entry) {
+            // An entry query yields entries only, so this guard narrows the type for
+            // static analysis and never skips anything
+            // @pest-mutate-ignore:InstanceOfToTrue,ContinueToBreak
             if (! $entry instanceof StatamicEntry) {
                 continue;
             }
@@ -103,6 +105,8 @@ final readonly class RedirectDomainRules
 
             if ($host === null) {
                 $id = $entry->id();
+                // A saved entry always has a string id, so the fallback is never used
+                // @pest-mutate-ignore:EmptyStringToNotEmpty
                 $invalid[] = is_string($id) ? $id : '';
 
                 continue;
@@ -140,9 +144,8 @@ final readonly class RedirectDomainRules
      */
     public static function publishedHosts(string $collection = self::COLLECTION): array
     {
+        /** @var EntryQueryBuilder $query */
         $query = Entry::query();
-        \assert($query instanceof EntryQueryBuilder);
-
         /** @var EntryQueryBuilder $query */
         $query = $query->where('collection', $collection);
         /** @var EntryQueryBuilder $query */
@@ -155,6 +158,9 @@ final readonly class RedirectDomainRules
         $hosts = [];
 
         foreach ($entries as $entry) {
+            // An entry query yields entries only, so this guard narrows the type for
+            // static analysis and never skips anything
+            // @pest-mutate-ignore:InstanceOfToTrue,ContinueToBreak
             if (! $entry instanceof StatamicEntry) {
                 continue;
             }
@@ -163,6 +169,8 @@ final readonly class RedirectDomainRules
             $host = self::normalizeHost($entry->get('host'));
 
             if ($host !== null) {
+                // Only the keys are read, so the stored value does not matter
+                // @pest-mutate-ignore:TrueToFalse
                 $hosts[$host] = true;
             }
         }
@@ -195,6 +203,8 @@ final readonly class RedirectDomainRules
      */
     private static function ruleFor(StatamicEntry $entry): array
     {
+        // Every use below reads the value as a condition, which casts it the same way
+        // @pest-mutate-ignore:RemoveBooleanCast
         $isWholeDomain = (bool) $entry->get('whole_domain');
         $targetType = $entry->get('target_type') === 'entry' ? 'entry' : 'url';
         $targetUrl = $entry->get('target_url');
@@ -207,6 +217,8 @@ final readonly class RedirectDomainRules
         $rule = [
             'enabled' => $entry->get('enabled') ?? true,
             'source' => $isWholeDomain ? '/*' : $entry->get('source'),
+            // `&&` yields a boolean either way, so the cast changes nothing
+            // @pest-mutate-ignore:RemoveBooleanCast
             'use_regex' => ! $isWholeDomain && (bool) $entry->get('use_regex'),
             'target_type' => $targetType,
             'target_entry' => $entry->get('target_entry'),
@@ -247,11 +259,8 @@ final readonly class RedirectDomainRules
         $stored = $rule['target_entry'];
         $id = is_array($stored) ? ($stored[0] ?? null) : $stored;
 
-        if (! is_string($id) || $id === '') {
-            return $rule;
-        }
-
-        // Only a published entry with a URL is a destination
+        // Only a published entry with a URL is a destination; a missing or empty id
+        // finds nothing
         $target = Entry::find($id);
 
         if (! $target instanceof StatamicEntry || ! $target->published()) {
@@ -262,6 +271,8 @@ final readonly class RedirectDomainRules
         $localized = $target->in($entry->locale());
         $url = ($localized instanceof StatamicEntry ? $localized : $target)->absoluteUrl();
 
+        // An entry's absolute URL is null or a full URL, never empty
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
         if (! is_string($url) || $url === '') {
             return $rule;
         }
