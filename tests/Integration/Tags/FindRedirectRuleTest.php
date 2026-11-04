@@ -29,13 +29,13 @@ uses(MockeryPHPUnitIntegration::class);
  * extracted in UAMS-Web/uams-statamic-archive#1765 so the link-health resolver cannot disagree with what this tag serves. The
  * tests are unchanged and still drive it through the tag.
  *
- * Mutation, measured in this package on Windows with PCOV through this file, the multisite and
- * mutation tests, and `TagParamTest`: the matcher's covered lines yield 197 mutants with two
- * untested, `BooleanAndToBooleanOr` on the merge's inner condition and `RemoveFunctionCall` on
- * the recursion-limit `ini_set()`. Each carries its reason beside the code
- * (UAMS-Web/uams-statamic-archive#2298). Fifteen more are uncovered: the four PCRE bound
- * constants, the `'0'` pattern skip, the missing-localization early return, and the
- * substitution-failure fallback. No test in the host application reached those branches either.
+ * Mutation, measured in this package on Windows with PCOV, for the matcher through this file and
+ * `RedirectRuleMatcherTest`: two mutants are untested, `BooleanAndToBooleanOr` on the merge's
+ * inner condition and `RemoveFunctionCall` on the recursion-limit `ini_set()`. Each carries its
+ * reason beside the code (UAMS-Web/uams-statamic-archive#2298). Four more read as uncovered:
+ * `IncrementInteger` and `DecrementInteger` on the pattern and subject byte limits, because a
+ * constant's declaration never registers as an executed line. Applied by hand, each of the four
+ * fails a test here or in `RedirectRuleMatcherTest`.
  *
  * @command  vendor/bin/pest tests/Integration/Tags/FindRedirectRuleTest.php
  */

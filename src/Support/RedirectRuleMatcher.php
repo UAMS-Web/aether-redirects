@@ -36,8 +36,15 @@ class RedirectRuleMatcher
 
     private const int MAX_REDIRECT_REGEX_SUBJECT_BYTES = 4096;
 
+    // Moving either step limit by one is not observable. A test would need a pattern whose
+    // match takes exactly the limit in steps, and PCRE counts steps differently under JIT and
+    // the interpreter, so no stable input sits on that edge. Measured with each of the four
+    // applied by hand: FindRedirectRuleTest and RedirectRuleMatcherTest pass unchanged.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     private const int REDIRECT_REGEX_PCRE_BACKTRACK_LIMIT = 50_000;
 
+    // The same reason as the backtrack limit above.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     private const int REDIRECT_REGEX_PCRE_RECURSION_LIMIT = 50_000;
 
     /**
