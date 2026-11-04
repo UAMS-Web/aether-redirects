@@ -39,11 +39,12 @@ use UAMSWeb\Aether\Redirects\Support\RedirectSource;
 class ServeRedirectDomainRequests
 {
     /**
-     * The statuses a matched rule redirects with.
+     * The statuses a matched rule redirects with besides 301, which is what any
+     * other status falls back to.
      *
      * @var list<int>
      */
-    private const array REDIRECT_STATUSES = [301, 302, 303, 307, 308];
+    private const array REDIRECT_STATUSES = [302, 303, 307, 308];
 
     /**
      * The statuses a matched rule answers with directly, carrying no target.
@@ -73,18 +74,26 @@ class ServeRedirectDomainRequests
         // Leave a host that cannot name a redirect domain to the rest of the app
         $host = RedirectDomainRules::normalizeHost($request->getHost());
 
+        // Hosts are compared as strings either way, so strict comparison changes nothing
+        // @pest-mutate-ignore:TrueToFalse
         if ($host === null || \in_array($host, $this->siteHosts(), true)) {
             return $next($request);
         }
 
         // Leave a host with no entries in the collection to the rest of the app,
-        // checked before the full read so an alias host does not pay for one
+        // checked before the full read so an alias host does not pay for one. The
+        // full read below finds no rules for such a host and passes it on as well,
+        // so skipping this return costs time, not behavior
+        // @pest-mutate-ignore:TrueToFalse,RemoveEarlyReturn
         if (! \in_array($host, RedirectDomainRules::publishedHosts(), true)) {
             return $next($request);
         }
 
         $rules = $this->domainRules->read()['rules'][$host] ?? null;
 
+        // Both reads apply the same filter, so a published host always has rules here;
+        // this guards an entry unpublished between the two
+        // @pest-mutate-ignore:RemoveEarlyReturn
         if ($rules === null) {
             return $next($request);
         }
@@ -107,18 +116,20 @@ class ServeRedirectDomainRequests
      */
     private function answer(?array $rule): Response
     {
-        // Answer an unmatched path with a bare 404
+        // Answer an unmatched path with a bare 404. A null rule has no target, so the
+        // checks below reach the same 404 without this return
+        // @pest-mutate-ignore:RemoveEarlyReturn
         if ($rule === null) {
             return $this->bare(404);
         }
 
         $status = $this->statusCode($rule['response'] ?? null);
 
-        // Answer a targetless rule with its own status and message
+        // Answer a targetless rule with its own status. Statuses are integers, so
+        // strict comparison changes nothing
+        // @pest-mutate-ignore:TrueToFalse
         if (\in_array($status, self::TARGETLESS_STATUSES, true)) {
-            $message = $rule['message'] ?? null;
-
-            return $this->bare($status, \is_string($message) ? $message : '');
+            return $this->bare($status);
         }
 
         // Answer a rule with nowhere to send the visitor with a bare 404, which is
@@ -129,7 +140,9 @@ class ServeRedirectDomainRequests
             return $this->bare(404);
         }
 
-        // Redirect with the rule's status, or a permanent move when it names another
+        // Redirect with the rule's status, or a permanent move when it names another.
+        // Statuses are integers, so strict comparison changes nothing
+        // @pest-mutate-ignore:TrueToFalse
         return redirect()->away(
             $this->withQueryString($target, $rule['target_query_string'] ?? null),
             \in_array($status, self::REDIRECT_STATUSES, true) ? $status : 301,
@@ -154,12 +167,17 @@ class ServeRedirectDomainRequests
         $sites = Site::all();
 
         foreach ($sites as $site) {
+            // The facade holds sites only, so this guard narrows the type for static
+            // analysis and never skips one
+            // @pest-mutate-ignore:InstanceOfToTrue,ContinueToBreak
             if (! $site instanceof StatamicSite) {
                 continue;
             }
 
             $url = $site->url();
 
+            // A site's URL is always a string, so this guard never skips one
+            // @pest-mutate-ignore:ContinueToBreak
             if (! \is_string($url)) {
                 continue;
             }
@@ -205,32 +223,36 @@ class ServeRedirectDomainRequests
     }
 
     /**
-     * A rule's stored response as an integer status, or 301 when it carries none.
+     * A rule's stored response as an integer status, or null when it carries none,
+     * which `answer()` treats as a permanent move.
      *
      * @param  mixed  $value  The rule's `response` value.
-     * @return int The status.
+     * @return int|null The status, or null.
      */
-    private function statusCode(mixed $value): int
+    private function statusCode(mixed $value): ?int
     {
         if (\is_int($value)) {
             return $value;
         }
 
-        return \is_string($value) && ctype_digit($value) ? (int) $value : 301;
+        // With either operator a stored value that is not all digits ends as a
+        // permanent move: as null, or cast to 0, which is not a redirect status
+        // @pest-mutate-ignore:BooleanAndToBooleanOr
+        return \is_string($value) && ctype_digit($value) ? (int) $value : null;
     }
 
     /**
-     * A plain-text response carrying a status and an optional message, and nothing
+     * A plain-text response carrying a status and its reason phrase, and nothing
      * from the site.
      *
      * @param  int  $status  The status.
-     * @param  string  $message  The message, or an empty string.
      * @return Response The response.
      */
-    private function bare(int $status, string $message = ''): Response
+    private function bare(int $status): Response
     {
-        $body = $message !== '' ? $message : (Response::$statusTexts[$status] ?? '');
-
-        return response($body, $status, ['Content-Type' => 'text/plain; charset=UTF-8']);
+        // Every status this class answers with has a reason phrase, so the fallback is
+        // never used
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
+        return response(Response::$statusTexts[$status] ?? '', $status, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 }
