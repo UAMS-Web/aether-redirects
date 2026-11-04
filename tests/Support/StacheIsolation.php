@@ -12,8 +12,9 @@ use Statamic\Facades\Fieldset;
 use Statamic\Facades\Stache;
 
 /**
- * Roots every Stache store, the blueprint directory and the fieldset directory in
- * this process's own throwaway directory for one test, and puts them back after.
+ * Roots every Stache store, the blueprint directory, the fieldset directory and
+ * the local search indexes in this process's own throwaway directory for one
+ * test, and puts them back after.
  *
  * Statamic's `PreventsSavingStacheItemsToDisk` reroots every store to one
  * `tests/__fixtures__/dev-null` directory that every worker shares and each
@@ -56,6 +57,11 @@ final class StacheIsolation
         Stache::stores()->each(function ($store) use ($root): void {
             $store->directory($root.'/stache/'.$store->key());
         });
+
+        // Point the local search indexes at the throwaway root. Saving an entry
+        // updates them, and their default directory is shared by every worker, so
+        // two workers creating it at once fail with `mkdir(): File exists`
+        config()->set('statamic.search.drivers.local.path', $root.'/search');
 
         // Point blueprints and fieldsets at the throwaway root
         Blueprint::setDirectory($root.'/blueprints');
