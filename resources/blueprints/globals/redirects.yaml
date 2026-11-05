@@ -1,0 +1,260 @@
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Redirects
+        instructions: 'Redirect URLs only when a 404 error hits.'
+        fields:
+          -
+            handle: redirects
+            field:
+              mode: stacked
+              display: Redirects
+              type: replicator
+              localizable: false
+              add_row: 'Add redirect'
+              always_save: false
+              collapse: accordion
+              hide_display: true
+              button_label: 'Add Redirect'
+              sets:
+                redirect_group:
+                  display: 'New Redirect'
+                  sets:
+                    redirect:
+                      display: Redirect
+                      fields:
+                        -
+                          handle: enabled
+                          field:
+                            type: toggle
+                            display: Enabled
+                            instructions: 'Off means this rule is ignored. A redirect captured automatically when an entry was deleted starts off, so it cannot send visitors anywhere until a target is set.'
+                            default: true
+                            localizable: false
+                            width: 33
+                        -
+                          handle: source
+                          field:
+                            display: 'Source URL (Redirect From)'
+                            instructions: |-
+                              This path should be relative to the root of this Statamic installation (or the sub-site, if you are running a multi-site). For example: `/my-old-url`.
+
+                              Appending a `*` wildcard character will match all requests with the base.
+
+                              Warning: Enabling regular expressions will disable wildcards and completely change the way the `*` symbol is interpreted.
+                            placeholder: /old-url
+                            validate:
+                              - required
+                            localizable: false
+                            width: 66
+                            instructions_position: below
+                        -
+                          handle: use_regex
+                          field:
+                            type: toggle
+                            display: 'Use Regular Expressions?'
+                            localizable: false
+                            width: 33
+                        -
+                          handle: target_type
+                          field:
+                            options:
+                              -
+                                key: entry
+                                value: 'Statamic Entry'
+                              -
+                                key: url
+                                value: 'Explicit URL'
+                            default: entry
+                            type: radio
+                            display: 'Target Type'
+                            localizable: false
+                            validate:
+                              - required
+                            inline: true
+                            replicator_preview: false
+                        -
+                          handle: target_entry
+                          field:
+                            display: 'Target Entry (Redirect To)'
+                            max_items: 1
+                            type: entries
+                            localizable: true
+                            listable: false
+                            validate:
+                              - required
+                              - sometimes
+                            width: 50
+                            if:
+                              target_type: 'equals entry'
+                        -
+                          handle: target_query_string
+                          field:
+                            prepend: '?'
+                            type: text
+                            display: 'Query String'
+                            localizable: false
+                            width: 50
+                            replicator_preview: false
+                            if:
+                              target_type: 'equals entry'
+                        -
+                          handle: target_url
+                          field: uamsweb_common.url
+                          config:
+                            display: 'Target URL (Redirect To)'
+                            validate:
+                              - required
+                              - sometimes
+                            width: 100
+                            instructions: |-
+                              This can be either an absolute URL or a relative URL (relative to the root of your website).
+
+                              Ending with a `*` wildcard character will append the request match to the redirect.
+                            if:
+                              target_type: 'equals url'
+                        -
+                          handle: response
+                          field:
+                            options:
+                              -
+                                key: '301'
+                                value: '301 Moved Permanently'
+                              -
+                                key: '302'
+                                value: '302 Found'
+                              -
+                                key: '303'
+                                value: '303 See Other'
+                              -
+                                key: '304'
+                                value: '304 Not Modified'
+                              -
+                                key: '307'
+                                value: '307 Temporary Redirect'
+                              -
+                                key: '308'
+                                value: '308 Permanent Redirect'
+                              -
+                                key: '403'
+                                value: '403 Forbidden'
+                              -
+                                key: '404'
+                                value: '404 Not Found'
+                              -
+                                key: '410'
+                                value: '410 Gone'
+                              -
+                                key: '451'
+                                value: '451 Unavailable For Legal Reasons'
+                            searchable: false
+                            display: 'HTTP Response Code'
+                            default: '301'
+                            type: radio
+                            instructions: 'You should almost always use `301 Moved Permanently`.'
+                            localizable: false
+                            width: 50
+                        -
+                          handle: order
+                          field:
+                            default: '30'
+                            type: integer
+                            display: Order
+                            instructions: |-
+                              The order value determines the order of operations for matching the requested path to a "Redirect From" value.
+
+                              Suppose you are redirecting entire folders (using regular expressions or wildcards). In that case, you should use `50` for the first folder level in the “Redirect From” field (i.e., `/foo/*`), `49` for the second folder level (i.e., `/foo/bar/*`), and so on.
+
+                              It is a good practice to set this to `30` for most page-specific redirects. This way, you can add more specific redirects that use lower-order values later.
+                            localizable: false
+                            width: 50
+                            instructions_position: below
+                        -
+                          handle: message
+                          field:
+                            type: textarea
+                            display: Message
+                            instructions: 'Optionally display a message to users when they navigate to a 403, 404, 410 or 451 endpoint.'
+                            localizable: false
+                            if:
+                              response: 'contains_any 403,404,410,451'
+                        -
+                          handle: valid_from
+                          field:
+                            type: date
+                            time_enabled: false
+                            display: 'Valid From'
+                            instructions: 'Optional. The redirect begins serving on this date. Leave blank to serve immediately.'
+                            localizable: false
+                            width: 50
+                        -
+                          handle: valid_until
+                          field:
+                            type: date
+                            time_enabled: false
+                            display: 'Valid Until'
+                            instructions: 'Optional. The redirect stops serving after this date (inclusive). Leave blank for no end date.'
+                            localizable: false
+                            width: 50
+                        -
+                          handle: requester
+                          field:
+                            type: text
+                            display: Requester
+                            instructions: 'Optional. Who requested this redirect (e.g. the marketing team or a person).'
+                            localizable: false
+                        -
+                          handle: notes
+                          field:
+                            type: textarea
+                            display: Notes
+                            instructions: 'You may optionally leave notes on this redirect (e.g. why was it created).'
+                            localizable: false
+                        -
+                          handle: status
+                          field:
+                            type: select
+                            display: 'Approval Status'
+                            instructions: |-
+                              Redirects created through the Marketing Redirects utility start as `Pending review` and only serve once an approver approves them. Redirects added here directly default to `Approved`.
+                            default: approved
+                            options:
+                              pending: 'Pending review'
+                              approved: Approved
+                              rejected: Rejected
+                            clearable: false
+                            localizable: false
+                            width: 50
+                        -
+                          handle: rejection_reason
+                          field:
+                            type: textarea
+                            display: 'Rejection Reason'
+                            instructions: 'Why the redirect request was rejected. Retained for the record.'
+                            localizable: false
+                            if:
+                              status: 'equals rejected'
+                        -
+                          handle: submitted_by
+                          field:
+                            type: users
+                            display: 'Submitted By'
+                            instructions: 'The Control Panel user who requested this redirect through the utility.'
+                            max_items: 1
+                            mode: default
+                            visibility: read_only
+                            localizable: false
+                            width: 50
+                        -
+                          handle: reviewed_by
+                          field:
+                            type: users
+                            display: 'Reviewed By'
+                            instructions: 'The approver who approved or rejected this redirect.'
+                            max_items: 1
+                            mode: default
+                            visibility: read_only
+                            localizable: false
+                            width: 50
