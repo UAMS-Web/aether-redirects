@@ -91,4 +91,10 @@ parameters:
     # site), with a comment naming the cause. Never a namespace-wide message
     # pattern. Unmatched entries fail the run (`reportUnmatchedIgnoredErrors`
     # defaults to true), so a stale ignore reds rather than rots.
-    ignoreErrors: []
+    ignoreErrors:
+        # Pest's uses() applies this trait to test files, which PHPStan cannot see,
+        # so it reports the trait as unused. Its logic is in StacheIsolation, which
+        # is analysed.
+        -
+            identifier: trait.unused
+            path: tests/Support/IsolatesStache.php

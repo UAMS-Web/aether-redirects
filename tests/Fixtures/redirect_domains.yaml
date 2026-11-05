@@ -1,0 +1,10 @@
+title: 'Redirect Domains'
+icon: link
+sites:
+  - default
+propagate: false
+revisions: false
+slugs: false
+title_format: '{{ host }}{{ if whole_domain }} (whole domain){{ else }}{{ source }}{{ /if }}'
+sort_by: title
+sort_dir: asc
