@@ -7,18 +7,16 @@ name: CI
 # script (and the other way round). The shared setup lives in
 # `.github/actions/setup/action.yml`.
 #
-# REQUIRED CHECKS. The organization ruleset "main: required checks
-# (<this repository>)" requires every job's `name:` below, plus the `name:` of the two
-# pull-request-body workflows, by that exact string. Renaming or adding a job here means
-# updating that ruleset's list in the same change: a renamed job leaves the old name pending
-# forever and blocks every pull request, and a new job is not required until it is listed.
-# Job names must stay unique across all workflows in this repository.
-# `check-required-checks.yml` compares the two lists and reports drift; see its header for the
-# order in which a job and its ruleset entry change.
+# REQUIRED CHECKS. The organization rulesets selected by the `required_checks` repository
+# property (`ci-aggregate` and `pr-body`) require three contexts by that exact string: `CI`,
+# `Attribution footer` and `Closing keywords`. Do not rename them: a required context no job
+# reports blocks every pull request. Other job names are not listed in any ruleset, so
+# renaming or adding a job needs no ruleset edit. Job names must stay unique across all
+# workflows in this repository.
 #
 # AGGREGATE. The last job, `CI`, `needs:` every other job in this file, runs `if: always()`, and
 # fails unless each of them succeeded, so a `skipped` or `cancelled` job fails it as well. It is
-# the one context that `required_checks=ci-aggregate` requires in place of the per-job list.
+# the one context that `required_checks=ci-aggregate` requires.
 # Add, rename or remove a job in this file and change the `needs:` list of `CI` in the same
 # change. The `aggregate-needs` job runs `check-aggregate-needs.mjs`, which fails when a job is
 # missing from that list. A job can only `needs:` jobs in its own workflow file, which is why the
