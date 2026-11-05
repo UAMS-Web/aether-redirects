@@ -9,6 +9,9 @@ use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Statamic\Exceptions\NotFoundHttpException;
+use Statamic\Facades\YAML;
+use Statamic\Fields\Blueprint as StatamicBlueprint;
+use Statamic\Fields\BlueprintRepository;
 use Statamic\Providers\AddonServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
@@ -58,6 +61,35 @@ class ServiceProvider extends AddonServiceProvider
         $kernel->pushMiddleware(ServeRedirectDomainRequests::class);
 
         $this->answerNotFoundWithRedirects();
+        $this->provideRedirectsBlueprint();
+    }
+
+    /**
+     * Serve the `redirects` global set's blueprint from this package when the host
+     * has none of its own (UAMS-Web/uams-statamic#398).
+     *
+     * Statamic looks a global set's blueprint up only in the host's blueprint
+     * directory, as `globals/<handle>.yaml`, so an add-on namespace cannot serve it.
+     * A fallback can: Statamic uses it only when that file is absent, so a host that
+     * keeps or saves its own copy, as the Control Panel's blueprint editor does,
+     * overrides this one. Its `target_url` field reads the host's `uamsweb_common`
+     * fieldset, as the redirect domains blueprint does.
+     */
+    private function provideRedirectsBlueprint(): void
+    {
+        $path = __DIR__.'/../resources/blueprints/globals/'.NotFoundRedirectResolver::GLOBAL_HANDLE.'.yaml';
+
+        // Resolved as the concrete repository rather than through the `Blueprint`
+        // facade, whose `setFallback()` docblock leaves `Closure` unimported
+        app(BlueprintRepository::class)->setFallback(
+            'globals.'.NotFoundRedirectResolver::GLOBAL_HANDLE,
+            function () use ($path): StatamicBlueprint {
+                $blueprint = new StatamicBlueprint;
+                $blueprint->setContents(YAML::file($path)->parse());
+
+                return $blueprint;
+            },
+        );
     }
 
     /**
