@@ -96,7 +96,9 @@ class NotFoundRedirectResolver
 
         $status = $this->statusCode($rule['response'] ?? null);
 
-        // Render the host's error view for a targetless status, with the rule's message
+        // Render the host's error view for a targetless status, with the rule's message.
+        // Statuses are integers, so strict comparison changes nothing
+        // @pest-mutate-ignore:TrueToFalse
         if (\in_array($status, self::SITE_RENDERED_STATUSES, true)) {
             $message = $rule['message'] ?? '';
 
@@ -114,6 +116,9 @@ class NotFoundRedirectResolver
             return null;
         }
 
+        // Redirect with the rule's status, or a permanent move when it names another.
+        // Statuses are integers, so strict comparison changes nothing
+        // @pest-mutate-ignore:TrueToFalse
         return redirect()->to(
             $this->withQueryString($target, $rule['target_query_string'] ?? null),
             \in_array($status, self::REDIRECT_STATUSES, true) ? $status : 301,
@@ -134,24 +139,19 @@ class NotFoundRedirectResolver
             return null;
         }
 
+        // Statamic always resolves a current site, from the request or the default
+        /** @var StatamicSite $site */
         $site = Site::current();
-        $default = Site::default();
-
-        // Statamic always resolves a current and a default site; the checks narrow the
-        // facade's return types for static analysis
-        if (! $site instanceof StatamicSite || ! $default instanceof StatamicSite) {
-            return null;
-        }
-
+        /** @var string $siteHandle */
         $siteHandle = $site->handle();
+
+        /** @var StatamicSite $default */
+        $default = Site::default();
+        /** @var string $defaultHandle */
         $defaultHandle = $default->handle();
 
-        if (! \is_string($siteHandle)) {
-            return null;
-        }
-
         $matched = $this->matcher->match(
-            $this->matcher->rulesForSite($global, $siteHandle, \is_string($defaultHandle) ? $defaultHandle : null),
+            $this->matcher->rulesForSite($global, $siteHandle, $defaultHandle),
             RedirectSource::normalize(URL::tidy($request->path())),
             $this->rawQueryString($request),
         );
@@ -208,7 +208,10 @@ class NotFoundRedirectResolver
     {
         $id = \is_array($stored) ? ($stored[0] ?? null) : $stored;
 
-        if (! \is_string($id) || $id === '') {
+        // Statamic finds no entry for an empty or non-string id either, so this guard
+        // only narrows the type for static analysis
+        // @pest-mutate-ignore:RemoveEarlyReturn
+        if (! \is_string($id)) {
             return null;
         }
 
@@ -219,11 +222,13 @@ class NotFoundRedirectResolver
         }
 
         // Prefer the entry's localization on the current site
+        /** @var StatamicSite $site */
         $site = Site::current();
-        $localized = $site instanceof StatamicSite ? $entry->in($site->handle()) : null;
+        $localized = $entry->in($site->handle());
         $url = ($localized instanceof StatamicEntry ? $localized : $entry)->url();
 
-        return \is_string($url) && $url !== '' ? $url : null;
+        // An entry in a collection with no route has no URL
+        return \is_string($url) ? $url : null;
     }
 
     /**
@@ -267,6 +272,9 @@ class NotFoundRedirectResolver
             return $value;
         }
 
+        // With either operator a stored value that is not all digits ends as null:
+        // `ctype_digit()` is false for every value that is not a string
+        // @pest-mutate-ignore:BooleanAndToBooleanOr
         return \is_string($value) && ctype_digit($value) ? (int) $value : null;
     }
 }

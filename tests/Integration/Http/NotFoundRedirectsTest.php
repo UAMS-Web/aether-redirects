@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Route;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View;
 use PHPUnit\Framework\Assert;
 use Statamic\Entries\Collection as StatamicCollection;
@@ -10,8 +11,11 @@ use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Entry;
 use Statamic\Facades\GlobalSet;
+use Statamic\Facades\Site;
 use Statamic\Globals\GlobalSet as StatamicGlobalSet;
 use Statamic\Globals\Variables;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 
 // Stache-isolated: each test saves the redirects global set, and some save entries.
@@ -251,18 +255,42 @@ it('renders the 404 page when no rule matches, or there is no redirects global s
     'no global set' => [false],
 ]);
 
-it('answers a plain abort(404) from a route the same way', function (): void {
-    Route::get('/aborts', fn () => abort(404));
+/**
+ * Hand a plain Symfony 404, which is what `abort(404)` raises, to the real
+ * exception handler for a request, as Laravel's kernel does. A route added at
+ * run time cannot raise one here: Statamic's catch-all route was registered
+ * first and answers the path before it.
+ *
+ * @param  string  $uri  The request URI.
+ */
+function plainNotFoundResponse(string $uri): Response
+{
+    $request = Request::create($uri);
+    app()->instance('request', $request);
+
+    // Typed as the contract, since a dev tool may bind its own adapter in its place
+    /** @var ExceptionHandler $handler */
+    $handler = app(ExceptionHandler::class);
+
+    return $handler->render($request, new SymfonyNotFoundHttpException);
+}
+
+it('answers a plain abort(404) the same way', function (): void {
     notFoundRules([notFoundRule('/aborts')]);
 
-    $this->get('/aborts')->assertStatus(301)->assertRedirect('https://uamshealth.com/destination');
+    $response = plainNotFoundResponse('/aborts?a=1');
+
+    expect($response->getStatusCode())->toBe(301)
+        ->and($response->headers->get('Location'))->toBe('https://uamshealth.com/destination?a=1');
 });
 
 it('leaves a plain abort(404) with no rule to the framework', function (): void {
-    Route::get('/aborts', fn () => abort(404));
     notFoundRules([notFoundRule('/elsewhere')]);
 
-    $this->get('/aborts')->assertStatus(404)->assertHeaderMissing('Location');
+    $response = plainNotFoundResponse('/aborts');
+
+    expect($response->getStatusCode())->toBe(404)
+        ->and($response->headers->has('Location'))->toBeFalse();
 });
 
 it('leaves a Control Panel 404 to Statamic, even with a rule for its path', function (): void {
@@ -277,4 +305,64 @@ it('leaves an API 404 to Statamic, even with a rule for its path', function (): 
     notFoundRules([notFoundRule('/api/no-such-thing')]);
 
     $this->get('/api/no-such-thing')->assertStatus(404)->assertHeaderMissing('Location');
+});
+
+it("redirects an entry target to its localization on the request's site, or else to the entry itself", function (): void {
+    config()->set(['statamic.system.multisite' => true, 'statamic.editions.pro' => true]);
+    Site::setSites([
+        'default' => ['name' => 'Enterprise', 'url' => '/', 'locale' => 'en_US'],
+        'excelsior' => ['name' => 'Excelsior', 'url' => '/excelsior/', 'locale' => 'en_US'],
+    ]);
+
+    $collection = Collection::make('pages');
+    Assert::assertInstanceOf(StatamicCollection::class, $collection);
+    $collection->sites(['default', 'excelsior']);
+    $collection->routes('/{slug}');
+    $collection->save();
+
+    // One destination is localized on the request's site; the other is not
+    $localized = notFoundDestination();
+    $localization = $localized->makeLocalization('excelsior');
+    Assert::assertInstanceOf(StatamicEntry::class, $localization);
+    $localization->save();
+
+    $unlocalized = Entry::make();
+    Assert::assertInstanceOf(StatamicEntry::class, $unlocalized);
+    $unlocalized->collection('pages');
+    $unlocalized->locale('default');
+    $unlocalized->slug('archive');
+    $unlocalized->data(['title' => 'Archive']);
+    $unlocalized->save();
+
+    notFoundRules([
+        notFoundRule('/excelsior/localized', ['target_type' => 'entry', 'target_entry' => [$localized->id()]]),
+        notFoundRule('/excelsior/unlocalized', ['target_type' => 'entry', 'target_entry' => [$unlocalized->id()]]),
+    ]);
+
+    $this->get('/excelsior/localized')->assertRedirect('http://localhost/excelsior/giving');
+    $this->get('/excelsior/unlocalized')->assertRedirect('http://localhost/archive');
+});
+
+it('renders the 404 page for an entry target in a collection with no route', function (): void {
+    $collection = Collection::make('unrouted');
+    Assert::assertInstanceOf(StatamicCollection::class, $collection);
+    $collection->save();
+
+    $entry = Entry::make();
+    Assert::assertInstanceOf(StatamicEntry::class, $entry);
+    $entry->collection('unrouted');
+    $entry->locale('default');
+    $entry->slug('nowhere');
+    $entry->data(['title' => 'Nowhere']);
+    $entry->save();
+
+    notFoundRules([notFoundRule('/old', ['target_type' => 'entry', 'target_entry' => [$entry->id()]])]);
+
+    $this->get('/old')->assertStatus(404)->assertSee('NOT FOUND PAGE');
+});
+
+it('adds nothing to the target for an empty stored query string', function (): void {
+    notFoundRules([notFoundRule('/old', ['target_query_string' => ''])]);
+
+    $this->get('/old')->assertRedirect('https://uamshealth.com/destination');
 });

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Assert;
 use Statamic\Facades\Addon;
+use Statamic\Statamic;
 use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
 
@@ -31,4 +33,34 @@ it('publishes its config file under the tag the README names', function (): void
     // Expect the package config to publish to the app's config directory
     expect(array_map(realpath(...), array_keys($paths)))->toBe([realpath(__DIR__.'/../../config/aether-redirects.php')])
         ->and(array_values($paths))->toBe([config_path('aether-redirects.php')]);
+});
+
+it('registers the Control Panel assets the committed build carries, from the directory it publishes', function (): void {
+    // Read the entry points of the committed Vite build
+    $directory = realpath(__DIR__.'/../../resources/dist/build');
+    Assert::assertIsString($directory);
+
+    /** @var array<string, array{isEntry?: bool}> $manifest */
+    $manifest = json_decode((string) file_get_contents($directory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    $entries = array_keys(array_filter($manifest, fn (array $chunk): bool => $chunk['isEntry'] ?? false));
+    sort($entries);
+
+    // Expect the registered inputs to be exactly those entry points
+    /** @var array<string, mixed> $vites */
+    $vites = Statamic::availableVites(request());
+    expect($vites)->toHaveKey('aether-redirects');
+
+    /** @var array{input: list<string>, hotFile: string} $vite */
+    $vite = $vites['aether-redirects'];
+    $input = $vite['input'];
+    sort($input);
+    expect($input)->toBe($entries);
+
+    // Expect the dev server's hot file beside the build, and the build to publish
+    // from the directory that holds the manifest
+    expect(realpath(dirname($vite['hotFile'])))->toBe(dirname($directory))
+        ->and(basename($vite['hotFile']))->toBe('hot');
+
+    $paths = ServiceProvider::pathsToPublish(ServiceProvider::class, 'aether-redirects');
+    expect(array_map(realpath(...), array_keys($paths)))->toContain($directory);
 });

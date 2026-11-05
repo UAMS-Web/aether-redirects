@@ -82,6 +82,9 @@ class ServiceProvider extends AddonServiceProvider
         /** @var ExceptionHandler $handler */
         $handler = $this->app->make(ExceptionHandler::class);
 
+        // Laravel's handler and every application's extend the framework's, so this
+        // only narrows the type for static analysis
+        // @pest-mutate-ignore:InstanceOfToTrue
         if ($handler instanceof Handler) {
             $handler->renderable(
                 fn (SymfonyNotFoundHttpException $exception, Request $request): ?Response => app(NotFoundRedirectResolver::class)->responseFor($request)
