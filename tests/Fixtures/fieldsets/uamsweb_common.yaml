@@ -1,0 +1,14 @@
+# A stand-in for the host's `uamsweb_common` fieldset, holding only the `url`
+# field the redirect_domains blueprint imports. The host's field is its own `url`
+# fieldtype, which this package does not have; a core text field with a URL input
+# stores the same string, which is all this package reads.
+title: 'UAMSWeb Common'
+fields:
+  -
+    handle: url
+    field:
+      type: text
+      input_type: url
+      display: 'Website URL'
+      placeholder: 'e.g., https://uams.edu/'
+      localizable: false
