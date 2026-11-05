@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 namespace UAMSWeb\Aether\Redirects;
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
+use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Http\Request;
+use Statamic\Exceptions\NotFoundHttpException;
 use Statamic\Providers\AddonServiceProvider;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
+use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
 
 /**
  * Service provider for the add-on.
@@ -36,8 +43,10 @@ class ServiceProvider extends AddonServiceProvider
     /**
      * Boot the add-on once Statamic has booted.
      *
-     * Registers the middleware that answers the redirect domains' requests. The
-     * host owns the `redirect_domains` collection, its config and its blueprint.
+     * Registers the middleware that answers the redirect domains' requests, and the
+     * hooks that answer a 404 with the `redirects` global set's rule for its path.
+     * The host owns the `redirect_domains` collection, the `redirects` global set,
+     * their config and their blueprints, and its error views.
      */
     public function bootAddon(): void
     {
@@ -47,5 +56,39 @@ class ServiceProvider extends AddonServiceProvider
         // Every Laravel HTTP kernel extends the framework's, which has pushMiddleware()
         $kernel = $this->app->make(HttpKernel::class);
         $kernel->pushMiddleware(ServeRedirectDomainRequests::class);
+
+        $this->answerNotFoundWithRedirects();
+    }
+
+    /**
+     * Answer a 404 with the stored redirect rule for its path, before the 404 page
+     * renders (UAMS-Web/uams-statamic#398).
+     *
+     * Statamic's own 404, which its routes raise for a URL with no content, runs
+     * its render hook first, ahead of any cached error page. A plain `abort(404)`
+     * raises Symfony's exception, which has no render of its own, so Laravel's
+     * handler reaches the `renderable()` callback for it. Either way a null from
+     * the resolver lets the 404 render as before.
+     */
+    private function answerNotFoundWithRedirects(): void
+    {
+        // Statamic binds the hook to the exception, so it reads the request it is given
+        NotFoundHttpException::renderUsing(
+            fn (Request $request): ?Response => app(NotFoundRedirectResolver::class)->responseFor($request)
+        );
+
+        // Every Laravel exception handler extends the framework's, which has renderable().
+        // Typed as the contract, since a dev tool may bind its own adapter in its place
+        /** @var ExceptionHandler $handler */
+        $handler = $this->app->make(ExceptionHandler::class);
+
+        // Laravel's handler and every application's extend the framework's, so this
+        // only narrows the type for static analysis
+        // @pest-mutate-ignore:InstanceOfToTrue
+        if ($handler instanceof Handler) {
+            $handler->renderable(
+                fn (SymfonyNotFoundHttpException $exception, Request $request): ?Response => app(NotFoundRedirectResolver::class)->responseFor($request)
+            );
+        }
     }
 }
