@@ -1,3 +1,11 @@
 // Control Panel entry point. Components, fieldtypes and Inertia pages register inside the
-// booting callback so they run once Statamic has initialized; none exist yet.
-Statamic.booting(() => {})
+// booting callback so they run once Statamic has initialized.
+import MarketingRedirectCreate from './pages/MarketingRedirectCreate.vue';
+import MarketingRedirectReview from './pages/MarketingRedirectReview.vue';
+
+Statamic.booting(() => {
+    // The marketing-redirect creation utility and its review queue, rendered by
+    // MarketingRedirectController
+    Statamic.$inertia.register('aether-redirects::MarketingRedirectCreate', MarketingRedirectCreate);
+    Statamic.$inertia.register('aether-redirects::MarketingRedirectReview', MarketingRedirectReview);
+});

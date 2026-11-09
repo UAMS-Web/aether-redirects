@@ -8,14 +8,21 @@ use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Statamic\CP\Navigation\NavItem;
 use Statamic\Exceptions\NotFoundHttpException;
+use Statamic\Facades\CP\Nav;
+use Statamic\Facades\Permission;
+use Statamic\Facades\User;
 use Statamic\Facades\YAML;
 use Statamic\Fields\Blueprint as StatamicBlueprint;
 use Statamic\Fields\BlueprintRepository;
 use Statamic\Providers\AddonServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
+use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
+use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
 
 /**
@@ -35,6 +42,10 @@ class ServiceProvider extends AddonServiceProvider
      *
      * @var array{input: list<string>, publicDirectory: string}
      */
+    // A property default is evaluated when the class compiles, so the coverage
+    // driver never attributes these lines to a test and every item reads as
+    // uncovered whatever the suite does. Statamic reads the value at boot.
+    // @pest-mutate-ignore:RemoveArrayItem
     protected $vite = [
         'input' => [
             'resources/js/cp.js',
@@ -46,8 +57,10 @@ class ServiceProvider extends AddonServiceProvider
     /**
      * Boot the add-on once Statamic has booted.
      *
-     * Registers the middleware that answers the redirect domains' requests, and the
-     * hooks that answer a 404 with the `redirects` global set's rule for its path.
+     * Registers the middleware that answers the redirect domains' requests, the
+     * hooks that answer a 404 with the `redirects` global set's rule for its path,
+     * and the marketing-redirect workflow's permissions, Control Panel routes and
+     * Tools nav items.
      * The host owns the `redirect_domains` collection, the `redirects` global set,
      * their config and their blueprints, and its error views.
      */
@@ -62,6 +75,94 @@ class ServiceProvider extends AddonServiceProvider
 
         $this->answerNotFoundWithRedirects();
         $this->provideRedirectsBlueprint();
+
+        $this->bootMarketingRedirectPermissions();
+        $this->bootMarketingRedirectRoutes();
+        $this->bootMarketingRedirectNav();
+    }
+
+    /**
+     * Register the marketing-redirect workflow's two permissions
+     * (UAMS-Web/uams-statamic#398).
+     *
+     * Requesting and approving are separate permissions, so a requester can be
+     * kept from approving their own request.
+     */
+    private function bootMarketingRedirectPermissions(): void
+    {
+        Permission::group('redirects', 'Redirects', function (): void {
+            Permission::register(MarketingRedirectController::PERMISSION)
+                ->label(__('Create marketing redirects'));
+            Permission::register(MarketingRedirectController::APPROVE_PERMISSION)
+                ->label(__('Approve marketing redirects'));
+        });
+    }
+
+    /**
+     * Register the create screen, the review queue and their endpoints as
+     * Control Panel routes, under the `marketing-redirects.` route names
+     * (UAMS-Web/uams-statamic#398).
+     */
+    private function bootMarketingRedirectRoutes(): void
+    {
+        $this->registerCpRoutes(function (): void {
+            Route::prefix('redirects/marketing')->name('marketing-redirects.')->group(function (): void {
+                Route::get('/', [MarketingRedirectController::class, 'create'])->name('create');
+                Route::post('/', [MarketingRedirectController::class, 'store'])->name('store');
+                Route::get('review', [MarketingRedirectController::class, 'index'])->name('review');
+                Route::post('{redirect}/approve', [MarketingRedirectController::class, 'approve'])->name('approve');
+                Route::post('{redirect}/reject', [MarketingRedirectController::class, 'reject'])->name('reject');
+            });
+        });
+    }
+
+    /**
+     * Add the Tools nav items, each shown only to a user holding its permission
+     * (UAMS-Web/uams-statamic#398).
+     *
+     * Requesters see the creation utility; approvers see the review queue,
+     * labelled with the number of requests awaiting approval.
+     */
+    private function bootMarketingRedirectNav(): void
+    {
+        Nav::extend(function ($nav): void {
+            /** @var \Statamic\Auth\File\User|null $user */
+            $user = User::current();
+
+            // Show nothing to a request with no signed-in user
+            if ($user === null) {
+                return;
+            }
+
+            // Show the creation utility to users who can request redirects
+            if ($user->can(MarketingRedirectController::PERMISSION)) {
+                /**
+                 * @var \Statamic\CP\Navigation\Nav $nav
+                 * @var NavItem $item
+                 */
+                $item = $nav->tools(__('Marketing Redirects')); // @phpstan-ignore method.notFound
+                $item->route('marketing-redirects.create');
+                $item->icon('hyperlink');
+            }
+
+            // Show the review queue, with its pending count, to approvers
+            if ($user->can(MarketingRedirectController::APPROVE_PERMISSION)) {
+                // Read the pending count once so approvers see outstanding work in the nav
+                $pending = app(MarketingRedirectStore::class)->pendingCount();
+
+                $label = $pending > 0
+                    ? sprintf('%s (%d)', __('Review Redirects'), $pending)
+                    : __('Review Redirects');
+
+                /**
+                 * @var \Statamic\CP\Navigation\Nav $nav
+                 * @var NavItem $reviewItem
+                 */
+                $reviewItem = $nav->tools($label); // @phpstan-ignore method.notFound
+                $reviewItem->route('marketing-redirects.review');
+                $reviewItem->icon('flag');
+            }
+        });
     }
 
     /**
