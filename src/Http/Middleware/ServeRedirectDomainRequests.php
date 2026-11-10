@@ -44,6 +44,9 @@ class ServeRedirectDomainRequests
      *
      * @var list<int>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the redirect-status dataset in `ServeRedirectDomainRequestsTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger
     private const array REDIRECT_STATUSES = [302, 303, 307, 308];
 
     /**
@@ -51,6 +54,9 @@ class ServeRedirectDomainRequests
      *
      * @var list<int>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the targetless-status dataset in `ServeRedirectDomainRequestsTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger
     private const array TARGETLESS_STATUSES = [403, 404, 410, 451];
 
     /**

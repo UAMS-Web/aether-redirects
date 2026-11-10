@@ -105,3 +105,57 @@ it('runs a pattern of exactly the byte limit and skips one a byte longer', funct
     expect($matcher->match([redirectRuleMatcherPatternRow($atLimit, '/served')], '/any', ''))->toHaveCount(1)
         ->and($matcher->match([redirectRuleMatcherPatternRow($overLimit, '/refused')], '/any', ''))->toBe([]);
 });
+
+it('runs against a path of exactly the subject byte limit and skips one a byte longer', function (): void {
+    // The pattern matches any path that opens with `/a`, so only the 4096-byte bound decides.
+    $atLimit = '/a'.str_repeat('a', 4094);
+    $overLimit = $atLimit.'a';
+
+    expect(strlen($atLimit))->toBe(4096)
+        ->and(strlen($overLimit))->toBe(4097);
+
+    $matcher = new RedirectRuleMatcher;
+    $rules = [redirectRuleMatcherPatternRow('^\/a', '/served')];
+
+    expect($matcher->match($rules, $atLimit, ''))->toHaveCount(1)
+        ->and($matcher->match($rules, $overLimit, ''))->toBe([]);
+});
+
+it('bounds both PCRE limits while an operation runs and restores them after', function (): void {
+    $backtrack = ini_get('pcre.backtrack_limit');
+    $recursion = ini_get('pcre.recursion_limit');
+
+    ini_set('pcre.backtrack_limit', '1234567');
+    ini_set('pcre.recursion_limit', '7654321');
+
+    try {
+        $method = new ReflectionMethod(RedirectRuleMatcher::class, 'withBoundedPcre');
+
+        $inside = $method->invoke(
+            new RedirectRuleMatcher,
+            static fn (): string => ini_get('pcre.backtrack_limit').'/'.ini_get('pcre.recursion_limit'),
+        );
+
+        expect($inside)->toBe('50000/50000')
+            ->and(ini_get('pcre.backtrack_limit'))->toBe('1234567')
+            ->and(ini_get('pcre.recursion_limit'))->toBe('7654321');
+    } finally {
+        ini_set('pcre.backtrack_limit', (string) $backtrack);
+        ini_set('pcre.recursion_limit', (string) $recursion);
+    }
+});
+
+it('keeps a default row whose source is not a string even when the site defines the same digits', function (): void {
+    // PHP turns the site's string key `'123'` into the integer 123. A default row carrying the
+    // integer 123 is not a string source, so no site source overrides it.
+    $site = [['source' => '123', 'target_url' => '/site']];
+    $default = [
+        ['source' => 123, 'target_url' => '/default-int'],
+        ['source' => '123', 'target_url' => '/default-string'],
+        ['target_url' => '/default-none'],
+    ];
+
+    $merged = (new RedirectRuleMatcher)->mergeDefaultRedirects($site, $default);
+
+    expect(array_column($merged, 'target_url'))->toBe(['/site', '/default-int', '/default-none']);
+});
