@@ -11,9 +11,13 @@
         "once you know why the new skip is correct, and say so in the PR."
     ],
     "bands": {
+        "suite": {
+            "expected": 0,
+            "why": "No test skips. Every test in the Unit and Integration suites runs. The called CI chain's pest job reads this band."
+        },
         "parallel": {
             "expected": 0,
-            "why": "No test skips. Every test in the Unit and Integration suites runs."
+            "why": "No test skips. Every test in the Unit and Integration suites runs. `composer test:bands` reads this band."
         }
     }
 }
