@@ -43,6 +43,9 @@ final class RedirectPattern
      *
      * @var list<string>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the delimiter dataset in `RedirectPatternTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem
     private const array BARE_PATTERN_DELIMITERS = ['@', '#', '~', '!', '%', '|'];
 
     /**
@@ -173,7 +176,11 @@ final class RedirectPattern
         // Pick a delimiter the bare pattern does not itself contain.
         $delimiter = self::freeDelimiter($source);
 
-        // Give up when every candidate delimiter appears in the pattern.
+        // Give up when every candidate delimiter appears in the pattern. Appending the modifiers
+        // cannot make a source that failed to compile as delimited compile: the failure is in the
+        // delimiters or the pattern, never in a missing modifier, so with the early return removed
+        // the same null comes back from the check below.
+        // @pest-mutate-ignore:RemoveEarlyReturn
         if ($delimiter === null) {
             return null;
         }
@@ -266,7 +273,10 @@ final class RedirectPattern
         set_error_handler(static fn (): bool => true);
 
         try {
-            // An empty subject is enough to force compilation without doing work.
+            // An empty subject is enough to force compilation without doing work. Compilation
+            // does not read the subject, so any other string reaches the same verdict, short of a match-time limit
+            // error that a pattern which compiles would have to be built to raise.
+            // @pest-mutate-ignore:EmptyStringToNotEmpty
             return preg_match($pattern, '') !== false;
         } finally {
             // Always hand the previous handler back.

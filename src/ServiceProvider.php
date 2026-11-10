@@ -35,6 +35,9 @@ class ServiceProvider extends AddonServiceProvider
      *
      * @var array{input: list<string>, publicDirectory: string}
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and `ViteBuildTest` and `ServiceProviderTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem
     protected $vite = [
         'input' => [
             'resources/js/cp.js',

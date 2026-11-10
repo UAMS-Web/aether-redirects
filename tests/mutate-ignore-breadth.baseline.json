@@ -1,0 +1,64 @@
+{
+    "findings": [
+        {
+            "path": "src/Console/Commands/GenerateEdgeRedirectManifest.php",
+            "marker": "// @pest-mutate-ignore:RemoveIntegerCast",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveIntegerCast=3"
+        },
+        {
+            "path": "src/Http/Middleware/ServeRedirectDomainRequests.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=4, IncrementInteger=4, DecrementInteger=4"
+        },
+        {
+            "path": "src/Http/Middleware/ServeRedirectDomainRequests.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=4, IncrementInteger=4, DecrementInteger=4"
+        },
+        {
+            "path": "src/ServiceProvider.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=4"
+        },
+        {
+            "path": "src/Services/EdgeRedirectManifestBuilder.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=5, IncrementInteger=5, DecrementInteger=5"
+        },
+        {
+            "path": "src/Services/NotFoundRedirectResolver.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=4, IncrementInteger=4, DecrementInteger=4"
+        },
+        {
+            "path": "src/Services/NotFoundRedirectResolver.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=3, IncrementInteger=3, DecrementInteger=3"
+        },
+        {
+            "path": "src/Services/RedirectDomainRules.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=3"
+        },
+        {
+            "path": "src/Support/MarketingRedirect.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=2"
+        },
+        {
+            "path": "src/Support/RedirectPattern.php",
+            "marker": "// @pest-mutate-ignore:RemoveArrayItem",
+            "finding": "removes MORE than one mutant of a named mutator",
+            "detail": "RemoveArrayItem=6"
+        }
+    ]
+}

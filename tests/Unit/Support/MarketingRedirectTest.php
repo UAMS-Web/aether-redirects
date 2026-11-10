@@ -122,3 +122,8 @@ it('renders null validity dates when the window is open', function (): void {
         ->and($row['use_regex'])->toBeFalse()
         ->and($row['type'])->toBe('redirect');
 });
+
+it('offers exactly the 301 and 302 responses to the host application', function (): void {
+    // The host validates the utility's `response` field against this list.
+    expect(MarketingRedirect::ALLOWED_RESPONSES)->toBe(['301', '302']);
+});

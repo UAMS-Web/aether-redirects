@@ -31,6 +31,9 @@ final readonly class MarketingRedirect
      * The default `order` value for a utility-created redirect, matching the
      * blueprint default so page-specific redirects sort predictably.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the stored `order` assertion in `MarketingRedirectTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     public const int DEFAULT_ORDER = 30;
 
     /**
@@ -39,6 +42,9 @@ final readonly class MarketingRedirect
      *
      * @var list<string>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the allowed-responses test in `MarketingRedirectTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem
     public const array ALLOWED_RESPONSES = ['301', '302'];
 
     /**
