@@ -72,6 +72,8 @@ jobs:
 
       # Fails, naming the two entries, when docs/DECISIONS.md is out of order.
       - run: node scripts/check-decision-log-order.mjs
+      - name: Seeded failure
+        run: exit 1
 
   scripts:
     name: Guard-script tests (vitest)
