@@ -318,5 +318,5 @@ it('builds the publish form and field meta the Control Panel renders for each bl
 })->with([
     'the lists collection' => [fn (): StatamicBlueprint => lookupEntryBlueprint('lookup_list.yaml')],
     'the options collection' => [fn (): StatamicBlueprint => lookupEntryBlueprint('lookup_option.yaml')],
-    'the parameters global set' => [fn (): StatamicBlueprint => lookupParametersBlueprint()],
+    'the parameters global set' => [lookupParametersBlueprint(...)],
 ]);
