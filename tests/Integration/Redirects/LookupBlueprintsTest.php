@@ -292,3 +292,22 @@ it("resolves a lookup collection's entry blueprint from the reference file copie
     'the lists collection' => [TaggedUrlLookup::LISTS_COLLECTION, 'lookup_list.yaml', 'members'],
     'the options collection' => [TaggedUrlLookup::OPTIONS_COLLECTION, 'lookup_option.yaml', 'list'],
 ]);
+
+it('builds the publish form and field meta the Control Panel renders for each blueprint', function (Closure $blueprint): void {
+    // The entries fields read the lists collection, which the host defines
+    $lists = Collection::make(TaggedUrlLookup::LISTS_COLLECTION);
+    Assert::assertInstanceOf(StatamicCollection::class, $lists);
+    $lists->save();
+
+    $resolved = $blueprint();
+    Assert::assertInstanceOf(StatamicBlueprint::class, $resolved);
+
+    $meta = $resolved->fields()->addValues([])->preProcess()->meta()->all();
+
+    expect($resolved->toPublishArray())->toHaveKey('tabs')
+        ->and(array_keys($meta))->toBe(lookupFieldHandles($resolved));
+})->with([
+    'the lists collection' => [fn (): StatamicBlueprint => lookupEntryBlueprint('lookup_list.yaml')],
+    'the options collection' => [fn (): StatamicBlueprint => lookupEntryBlueprint('lookup_option.yaml')],
+    'the parameters global set' => [fn (): StatamicBlueprint => lookupParametersBlueprint()],
+]);
