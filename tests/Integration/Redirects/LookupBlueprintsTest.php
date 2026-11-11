@@ -13,6 +13,7 @@ use Statamic\Facades\GlobalSet;
 use Statamic\Facades\YAML;
 use Statamic\Fields\Blueprint as StatamicBlueprint;
 use Statamic\Fields\Field;
+use Statamic\Fields\Fields;
 use Statamic\Globals\GlobalSet as StatamicGlobalSet;
 use Statamic\Globals\Variables;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
@@ -302,7 +303,15 @@ it('builds the publish form and field meta the Control Panel renders for each bl
     $resolved = $blueprint();
     Assert::assertInstanceOf(StatamicBlueprint::class, $resolved);
 
-    $meta = $resolved->fields()->addValues([])->preProcess()->meta()->all();
+    $fields = $resolved->fields()->addValues([]);
+    Assert::assertInstanceOf(Fields::class, $fields);
+
+    $processed = $fields->preProcess();
+    Assert::assertInstanceOf(Fields::class, $processed);
+
+    $meta = $processed->meta();
+    Assert::assertInstanceOf(Illuminate\Support\Collection::class, $meta);
+    $meta = $meta->all();
 
     expect($resolved->toPublishArray())->toHaveKey('tabs')
         ->and(array_keys($meta))->toBe(lookupFieldHandles($resolved));
