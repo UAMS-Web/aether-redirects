@@ -46,7 +46,7 @@
     },
     "require": {
         "php": "^8.4",
-        "statamic/cms": "^6.35"
+        "statamic/cms": "^6.40"
     },
     "require-dev": {
         "cweagans/composer-patches": "^2.0",

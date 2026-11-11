@@ -6,7 +6,7 @@ The code is being moved into this add-on from `UAMS-Web/uams-statamic`; until th
 
 ## Requirements
 
-PHP 8.4 or later and Statamic 6.35 or later.
+PHP 8.4 or later and Statamic 6.40 or later.
 
 ## Installation
 
