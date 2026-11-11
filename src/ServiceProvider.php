@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 
 /**
  * Service provider for the add-on.
@@ -65,6 +66,7 @@ class ServiceProvider extends AddonServiceProvider
 
         $this->answerNotFoundWithRedirects();
         $this->provideRedirectsBlueprint();
+        $this->provideParametersBlueprint();
     }
 
     /**
@@ -80,12 +82,38 @@ class ServiceProvider extends AddonServiceProvider
      */
     private function provideRedirectsBlueprint(): void
     {
-        $path = __DIR__.'/../resources/blueprints/globals/'.NotFoundRedirectResolver::GLOBAL_HANDLE.'.yaml';
+        $this->provideGlobalBlueprint(NotFoundRedirectResolver::GLOBAL_HANDLE);
+    }
+
+    /**
+     * Serve the `tagged_url_parameters` global set's blueprint from this package when
+     * the host has none of its own (UAMS-Web/aether-redirects#51).
+     *
+     * The lists and options collections get no blueprint from here. Statamic reads a
+     * collection's entry blueprints from files only, with no fallback to fall back on,
+     * and registering this package's directory for them would make Statamic ignore a
+     * host's own. Their blueprints are `docs/blueprints/lookup_list.yaml` and
+     * `docs/blueprints/lookup_option.yaml`, for the host's content repository to copy.
+     */
+    private function provideParametersBlueprint(): void
+    {
+        $this->provideGlobalBlueprint(TaggedUrlLookup::PARAMETERS_GLOBAL);
+    }
+
+    /**
+     * Serve a global set's blueprint from `resources/blueprints/globals`, which
+     * Statamic uses only when the host has no blueprint file of its own for the set.
+     *
+     * @param  string  $handle  The global set's handle.
+     */
+    private function provideGlobalBlueprint(string $handle): void
+    {
+        $path = __DIR__.'/../resources/blueprints/globals/'.$handle.'.yaml';
 
         // Resolved as the concrete repository rather than through the `Blueprint`
         // facade, whose `setFallback()` docblock leaves `Closure` unimported
         app(BlueprintRepository::class)->setFallback(
-            'globals.'.NotFoundRedirectResolver::GLOBAL_HANDLE,
+            'globals.'.$handle,
             function () use ($path): StatamicBlueprint {
                 $blueprint = new StatamicBlueprint;
                 $blueprint->setContents(YAML::file($path)->parse());

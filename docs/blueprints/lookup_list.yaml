@@ -1,0 +1,27 @@
+title: 'Lookup list'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: List
+        fields:
+          -
+            handle: title
+            field:
+              type: text
+              display: Title
+              instructions: 'The name editors see when choosing this list.'
+              required: true
+              localizable: false
+          -
+            handle: members
+            field:
+              type: entries
+              display: 'Member lists'
+              instructions: 'Leave empty for a list with its own options. A composed list shows its member lists in this order, skipping any option already present.'
+              collections:
+                - lookup_lists
+              mode: default
+              create: false
+              localizable: false
