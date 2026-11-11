@@ -1,0 +1,155 @@
+title: 'Lookup option'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Option
+        fields:
+          -
+            handle: title
+            field:
+              type: text
+              display: Label
+              instructions: 'The text editors and requesters see.'
+              required: true
+              localizable: false
+              width: 50
+          -
+            handle: value
+            field:
+              type: text
+              display: Value
+              instructions: 'The text put in the tagged URL when this option is chosen.'
+              required: true
+              localizable: false
+              width: 50
+          -
+            handle: list
+            field:
+              type: entries
+              display: List
+              instructions: 'The list this option belongs to.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              required: true
+              localizable: false
+      -
+        display: 'Downstream lists'
+        instructions: 'The list each later step offers once this option is chosen. Leave a step empty to use the list a shallower choice names, then the generic list for that step.'
+        fields:
+          -
+            handle: source_platform
+            field:
+              type: entries
+              display: 'Source platform list'
+              instructions: 'The list offered for the source platform step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: medium
+            field:
+              type: entries
+              display: 'Medium list'
+              instructions: 'The list offered for the medium step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: creative_format
+            field:
+              type: entries
+              display: 'Creative format list'
+              instructions: 'The list offered for the creative format step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: specifications
+            field:
+              type: entries
+              display: 'Specifications list'
+              instructions: 'The list offered for the specifications step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: placement
+            field:
+              type: entries
+              display: 'Placement list'
+              instructions: 'The list offered for the placement step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: term
+            field:
+              type: entries
+              display: 'Term list'
+              instructions: 'The list offered for the term step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: content
+            field:
+              type: entries
+              display: 'Content list'
+              instructions: 'The list offered for the content step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+  sidebar:
+    display: Sidebar
+    sections:
+      -
+        fields:
+          -
+            handle: active
+            field:
+              type: toggle
+              display: Active
+              instructions: 'Off retires the option: it is no longer offered, and a URL already issued with it stays explainable.'
+              default: true
+              localizable: false
+          -
+            handle: order
+            field:
+              type: integer
+              display: Order
+              instructions: 'Position within its list, lowest first.'
+              default: 0
+              localizable: false

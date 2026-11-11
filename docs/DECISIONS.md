@@ -57,3 +57,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Open.** Whether the Control Panel selector can send a sibling field's value, which decides how much custom interface code the cascade needs (`UAMS-Web/aether-redirects#26`). Whether an add-on can ship collection blueprints the way it ships the `redirects` global's. The spreadsheet's "Inherit UTM Tables?" 0/1 column is read by no formula in the workbook and is left out of the design; its meaning is a question for the sheet's owner.
 
 **Companion.** `UAMS-Web/aether-redirects#45`, `UAMS-Web/aether-redirects#26`, `UAMS-Web/uams-statamic#301`.
+
+## 2026-11-11: The add-on serves the parameters blueprint, and the lookup collections' blueprints are reference files (#51)
+
+**Decision.** The add-on serves the `tagged_url_parameters` global set's blueprint as a fallback, the way it serves the `redirects` one, and that global also carries the generic fallback list of each cascade step as `fallback_<step>` fields. It serves no blueprint for the lists and options collections: their fields are the reference files `docs/blueprints/lookup_list.yaml` and `docs/blueprints/lookup_option.yaml`, which the content repository copies into its blueprint directory. The handles are `lookup_lists`, `lookup_options` and `tagged_url_parameters`, named in `TaggedUrlLookup`.
+
+**Why.** Read against `statamic/cms` v6.40.0 (`34dd84d35d9aaaeb86c22d7a4416e833f56c5bf6`, installed copy): `Collection::getEntryBlueprints()` reads `Blueprint::in('collections/<handle>')`, which lists the files of that namespace and consults no fallback, and `BlueprintRepository::setFallback()` serves only `find()`. The one other route, `addNamespace()`, throws `Undefined array key 0` while listing unless the namespace is registered under both `collections.<handle>` and `collections/<handle>`, and once registered it replaces the host's blueprint directory for that collection, so a host's own blueprint is ignored and only a copy under `vendor/` can override it. A global set has the fallback hook, so its blueprint ships the way the `redirects` one does. Putting the generic fallbacks in that global gives the Control Panel one place to choose them without a third instance for the host to define.
+
+**Rejected.** Registering the collection namespaces: it depends on the two spellings and removes the host's precedence, which is the workaround the ticket said not to build. Shipping the collection YAML under `resources/blueprints/collections` unserved: files that look served and are not. A separate global for the fallbacks: one more instance for the host to define for seven fields.
+
+**Companion.** `UAMS-Web/aether-redirects#51`, `UAMS-Web/aether-submodule-content#96`.
