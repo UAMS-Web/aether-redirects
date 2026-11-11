@@ -58,7 +58,7 @@ A Statamic add-on (`uams-web/aether-redirects`, namespace `UAMSWeb\Aether\Redire
 
 ### Layout and tests
 
-- `src/` holds the add-on (PHP floor `^8.4`, `statamic/cms` `^6.35`); `tests/Unit` boots nothing, `tests/Integration` boots a minimal Statamic through Testbench (`tests/TestCase.php`).
+- `src/` holds the add-on (PHP floor `^8.4`, `statamic/cms` `^6.40`); `tests/Unit` boots nothing, `tests/Integration` boots a minimal Statamic through Testbench (`tests/TestCase.php`).
 - Host-bound tests belong in `tests/Feature/` and are not part of `composer ci` (PHPStan excludes the directory); the `host-only-behavior-needs-a-host-run` rule says when a host run is required, and `docs/DEVELOPMENT.md` is the host setup and the commands to run them.
 - `composer test:tia` is Pest's test impact analysis for the inner loop: the first run records a dependency graph (needs PCOV; stored under `~/.pest/tia`, outside the repository), later runs replay unaffected tests from cache. It applies only to a full run, so `--testsuite` or `--filter` bypasses it, and it is never the gate: `composer ci` and CI run the real suite.
 - Tests run in parallel workers, so a test must not share mutable state with another: no fixed file paths, cache keys or Stache/form storage directories. Give each worker its own directory (`ParallelTesting::token()` or `uniqid()`) when a test writes files.
