@@ -196,7 +196,10 @@ it('renders the 404 page for an entry target that is unpublished, missing or emp
  */
 function notFoundRedirectEntry(StatamicEntry $from, StatamicEntry $to): void
 {
-    $from->set('redirect', 'entry::'.$to->id());
+    $id = $to->id();
+    Assert::assertIsString($id);
+
+    $from->set('redirect', 'entry::'.$id);
     $from->save();
 }
 
@@ -215,6 +218,7 @@ it('redirects an entry target that itself redirects to another entry, to that en
 
 it('stops at a looping entry redirect: the rule goes to the entry, which renders the 404 page', function (Closure $loop): void {
     $giving = $loop();
+    Assert::assertInstanceOf(StatamicEntry::class, $giving);
     notFoundRules([notFoundRule('/old', ['target_type' => 'entry', 'target_entry' => [$giving->id()]])]);
 
     // A loop resolves to no redirect, so the rule's target is the entry's own URL
