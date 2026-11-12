@@ -748,6 +748,7 @@ it('refuses a submission that breaks one field rule, naming that field', functio
     'destination too long' => ['destination', '/'.str_repeat('d', 2048)],
     'response missing' => ['response', 'MISSING'],
     'response not a string' => ['response', ['301']],
+    'response sent as an integer' => ['response', 301],
     'response not an allowed code' => ['response', '307'],
     'valid_from not a date' => ['valid_from', 'not-a-date'],
     'valid_until not a date' => ['valid_until', 'not-a-date'],

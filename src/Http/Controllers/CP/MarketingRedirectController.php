@@ -199,10 +199,6 @@ class MarketingRedirectController extends CpController
         $validated = $request->validate([
             'source' => ['required', 'string', 'max:2048'],
             'destination' => ['required', 'string', 'max:2048'],
-            // Removing 'string' is equivalent: without an 'array' rule, Laravel's `in`
-            // rule fails an array value itself. Removing the other two items is
-            // killed by the store validation dataset.
-            // @pest-mutate-ignore:RemoveArrayItem
             'response' => ['required', 'string', Rule::in(MarketingRedirect::ALLOWED_RESPONSES)],
             'valid_from' => ['nullable', 'date'],
             'valid_until' => ['nullable', 'date'],
