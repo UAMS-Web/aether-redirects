@@ -1,5 +1,8 @@
 {
     "patches": {
+        "orchestra/testbench-core": {
+            "Give each parallel test worker its own service manifest (temporary; see UAMS-Web/patches-orchestra-testbench-core#1)": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-services-manifest.patch"
+        },
         "pestphp/pest-plugin-mutate": {
             "Launch each mutant child process so a run cannot score every mutant killed without executing one (temporary; see #2322)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-mutant-process-launch.patch",
             "Stop three silent @pest-mutate-ignore parsing defects suppressing nothing or the wrong set (temporary; see #2327)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-annotation-parsing.patch",

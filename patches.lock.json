@@ -1,6 +1,18 @@
 {
-    "_hash": "bd4762eedc867ca9af1840f3040de53a2e7401258a71eeae77bf03fa3e54ad41",
+    "_hash": "b8afca1628ae253da12a9ea310cf761d0be64719fe011fc310627df1931997e0",
     "patches": {
+        "orchestra/testbench-core": [
+            {
+                "package": "orchestra/testbench-core",
+                "description": "Give each parallel test worker its own service manifest (temporary; see UAMS-Web/patches-orchestra-testbench-core#1)",
+                "url": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-services-manifest.patch",
+                "sha256": "0b2c164aa2bf3a27c69db0e3c067f001479324e409035ffeb9a1fee36eb03be1",
+                "depth": 1,
+                "extra": {
+                    "provenance": "patches-file:patches.json"
+                }
+            }
+        ],
         "pestphp/pest-plugin-mutate": [
             {
                 "package": "pestphp/pest-plugin-mutate",

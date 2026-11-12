@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fc6d69ff4dd633476d1f90ab76544577",
+    "content-hash": "56e0fdffc40746186397d889ce78f6ae",
     "packages": [
         {
             "name": "ajthinking/archetype",
@@ -13653,6 +13653,46 @@
                 "source": "https://github.com/ta-tikoma/phpunit-architecture-test/tree/0.8.7"
             },
             "time": "2026-02-17T17:25:14+00:00"
+        },
+        {
+            "name": "uams-web/patches-orchestra-testbench-core",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/UAMS-Web/patches-orchestra-testbench-core.git",
+                "reference": "a2e4cbf20079a8231c1435477ce4ac00135f75c9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/UAMS-Web/patches-orchestra-testbench-core/zipball/a2e4cbf20079a8231c1435477ce4ac00135f75c9",
+                "reference": "a2e4cbf20079a8231c1435477ce4ac00135f75c9",
+                "shasum": ""
+            },
+            "require": {
+                "orchestra/testbench-core": "11.6.0"
+            },
+            "type": "library",
+            "extra": {
+                "patches": {
+                    "orchestra/testbench-core": {
+                        "Give each parallel test worker its own service manifest (temporary; see UAMS-Web/patches-orchestra-testbench-core#1)": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-services-manifest.patch"
+                    }
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Patches UAMS-Web repositories apply to orchestra/testbench-core",
+            "keywords": [
+                "composer",
+                "patches",
+                "testbench"
+            ],
+            "support": {
+                "issues": "https://github.com/UAMS-Web/patches-orchestra-testbench-core/issues",
+                "source": "https://github.com/UAMS-Web/patches-orchestra-testbench-core"
+            },
+            "time": "2026-11-11T23:07:21+00:00"
         },
         {
             "name": "uams-web/patches-pest-plugin-mutate",
