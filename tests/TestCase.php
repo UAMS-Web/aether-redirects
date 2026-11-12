@@ -22,6 +22,27 @@ abstract class TestCase extends AddonTestCase
     protected string $addonServiceProvider = ServiceProvider::class;
 
     /**
+     * Tell Testbench it is running in a parallel worker, before it builds the application.
+     *
+     * Testbench gives each worker its own package and service manifests only when
+     * `LARAVEL_PARALLEL_TESTING` is set, as Laravel's parallel runner sets it. Pest
+     * sets it only for a Laravel application, not for a package, where Testbench's
+     * test case exists. Without it every worker rebuilds the one shared
+     * `bootstrap/cache/packages.php`, and on Windows a cold run fails when a worker
+     * replaces it while another holds it open (#74).
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        // Pest's paratest workers carry a token and nothing else that marks them parallel
+        if (isset($_SERVER['TEST_TOKEN'])) {
+            $_SERVER['LARAVEL_PARALLEL_TESTING'] = $_ENV['LARAVEL_PARALLEL_TESTING'] = '1';
+        }
+
+        parent::setUp();
+    }
+
+    /**
      * Give each parallel worker its own license-check cache, after Statamic's
      * test case sets the shared one.
      *
