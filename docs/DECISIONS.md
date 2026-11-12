@@ -46,6 +46,16 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 
 **Companion.** `UAMS-Web/uams-statamic#397`, `UAMS-Web/uams-statamic#3039`.
 
+## 2026-11-09: The marketing-redirect workflow moves to the add-on; the host keeps the `redirect_domain` blueprint (`UAMS-Web/uams-statamic#398`)
+
+**Decision.** The operator decided on 2026-11-09 that the marketing-redirect request and approval workflow moves out of `UAMS-Web/uams-statamic` into this add-on: the CP controller, `MarketingRedirectStore`, `RedirectCollisionDetector`, the two Vue pages, the two permissions, the CP routes under `redirects/marketing` and the two Tools nav items. The host keeps the `redirects` global set the workflow writes into, the `redirect_domains` collection, and that collection's `redirect_domain` blueprint.
+
+**Why.** The workflow writes only to the `redirects` global set the add-on already answers 404s from, so it belongs with the rest of the redirect surface, and keeping it in the site left the extraction half done. The blueprint stays because `Blueprint::addNamespace` cannot serve a collection blueprint on Statamic 6.38.0 (`UAMS-Web/aether-redirects#35`).
+
+**Rejected.** Leaving the workflow in the site and recording it as host-owned: it splits one redirect surface across two repositories with no boundary reason. Moving the `redirect_domain` blueprint too: Statamic cannot load it from an add-on namespace.
+
+**Companion.** `UAMS-Web/uams-statamic#398`.
+
 ## 2026-11-09: Lookup lists, cascade, parameters and permissions are stored as two collections and a global (#45)
 
 **Decision.** The tagged URL builder's lookup data lives in the site's content as two collections, one of lists and one of options, so the Control Panel edits it as ordinary entries. The cascade is carried by per-step pointers on options: each option can name the downstream list for each later step (source platform, medium, creative format, specifications, placement, and term and content where they apply), the deepest option row that names a list wins, shallower rows are fallbacks, and a step with no pointer at any depth falls back to one generic list per step (seven). A list can include other lists by member order, so a composed source list is its member lists in sequence with entries already present skipped. The parameters a tagged URL carries are defined in a `tagged_url_parameters` global: checkboxes for the Google Analytics standard parameters and a grid for custom ones. All 18 names in use are kept as they are (8 Google Analytics standard, 10 UAMS-only), so no parameter is renamed. Permissions are the native collection and global permissions only; the add-on adds none, and a list-manager role is defined in the content repository. A custom value is appended to the list value with `_` and the result is lowercased, and the per-request suppress flag blanks every `utm_*` value, which are the rules of the spreadsheet being retired.
