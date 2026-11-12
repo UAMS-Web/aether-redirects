@@ -22,38 +22,24 @@ abstract class TestCase extends AddonTestCase
     protected string $addonServiceProvider = ServiceProvider::class;
 
     /**
-     * Tell Testbench it is in a parallel run before it boots the application.
+     * Tell Testbench it is running in a parallel worker, before it builds the application.
      *
-     * Pest sets `LARAVEL_PARALLEL_TESTING` only for a Laravel application, and
-     * Testbench's `TestCase` marks this suite as a package, so the variable is
-     * never set here. Testbench then treats every worker as the only process and
-     * writes the shared `bootstrap/cache/packages.php`, which on Windows fails
-     * with "Access is denied" when one worker replaces it while another holds it
-     * open (#74). With the variable set, each worker gets its own manifest file.
+     * Testbench gives each worker its own package and service manifests only when
+     * `LARAVEL_PARALLEL_TESTING` is set, as Laravel's parallel runner sets it. Pest
+     * sets it only for a Laravel application, not for a package, where Testbench's
+     * test case exists. Without it every worker rebuilds the one shared
+     * `bootstrap/cache/packages.php`, and on Windows a cold run fails when a worker
+     * replaces it while another holds it open (#74).
      */
     #[\Override]
     protected function setUp(): void
     {
-        self::markParallelRun($_SERVER['TEST_TOKEN'] ?? null);
-
-        parent::setUp();
-    }
-
-    /**
-     * Set `LARAVEL_PARALLEL_TESTING` for a parallel worker, and only for one.
-     *
-     * @param  mixed  $token  The parallel worker token, or null outside a parallel run.
-     * @return bool Whether the variable was set by this call.
-     */
-    public static function markParallelRun(mixed $token): bool
-    {
-        if (! is_string($token) && ! is_int($token) || ! empty($_SERVER['LARAVEL_PARALLEL_TESTING'])) {
-            return false;
+        // Pest's paratest workers carry a token and nothing else that marks them parallel
+        if (isset($_SERVER['TEST_TOKEN'])) {
+            $_SERVER['LARAVEL_PARALLEL_TESTING'] = $_ENV['LARAVEL_PARALLEL_TESTING'] = '1';
         }
 
-        $_SERVER['LARAVEL_PARALLEL_TESTING'] = $_ENV['LARAVEL_PARALLEL_TESTING'] = '1';
-
-        return true;
+        parent::setUp();
     }
 
     /**
