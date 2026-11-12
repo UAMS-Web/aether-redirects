@@ -53,6 +53,9 @@ final readonly class RedirectDomainRules
      *
      * @var list<string>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the validity window and approval status test in `RedirectDomainRulesTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem
     private const array GATE_FIELDS = ['valid_from', 'valid_until', 'status'];
 
     /**

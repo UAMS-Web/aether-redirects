@@ -79,8 +79,9 @@ function notFoundRule(string $source, array $overrides = []): array
  * Save an entry in a routed collection, for an entry target.
  *
  * @param  bool  $published  Whether the entry is published.
+ * @param  string  $slug  The entry's slug.
  */
-function notFoundDestination(bool $published = true): StatamicEntry
+function notFoundDestination(bool $published = true, string $slug = 'giving'): StatamicEntry
 {
     if (Collection::findByHandle('pages') === null) {
         $collection = Collection::make('pages');
@@ -93,9 +94,9 @@ function notFoundDestination(bool $published = true): StatamicEntry
     Assert::assertInstanceOf(StatamicEntry::class, $entry);
     $entry->collection('pages');
     $entry->locale('default');
-    $entry->slug('giving');
+    $entry->slug($slug);
     $entry->published($published);
-    $entry->data(['title' => 'Giving']);
+    $entry->data(['title' => ucfirst($slug)]);
     $entry->save();
 
     return $entry;
@@ -186,6 +187,69 @@ it('renders the 404 page for an entry target that is unpublished, missing or emp
     'empty' => [fn (): array => []],
     'not an id' => [fn (): array => [42]],
 ]);
+
+/**
+ * Point an entry's own `redirect` field at another entry.
+ *
+ * @param  StatamicEntry  $from  The entry that redirects.
+ * @param  StatamicEntry  $to  The entry it redirects to.
+ */
+function notFoundRedirectEntry(StatamicEntry $from, StatamicEntry $to): void
+{
+    $id = $to->id();
+    Assert::assertIsString($id);
+
+    $from->set('redirect', 'entry::'.$id);
+    $from->save();
+}
+
+/**
+ * Statamic 6.40.0 (statamic/cms#15746) resolves a looping entry `redirect` to null, where
+ * 6.39.0 recursed without end (statamic/cms#15745). These cases need 6.40.0 or later.
+ */
+it('redirects an entry target that itself redirects to another entry, to that entry', function (): void {
+    $archive = notFoundDestination(slug: 'archive');
+    $giving = notFoundDestination();
+    notFoundRedirectEntry($giving, $archive);
+    notFoundRules([notFoundRule('/old', ['target_type' => 'entry', 'target_entry' => [$giving->id()]])]);
+
+    $this->get('/old')->assertStatus(301)->assertRedirect('http://localhost/archive');
+});
+
+it('stops at a looping entry redirect: the rule goes to the entry, which renders the 404 page', function (Closure $loop): void {
+    $giving = $loop();
+    Assert::assertInstanceOf(StatamicEntry::class, $giving);
+    notFoundRules([notFoundRule('/old', ['target_type' => 'entry', 'target_entry' => [$giving->id()]])]);
+
+    // A loop resolves to no redirect, so the rule's target is the entry's own URL
+    $this->get('/old')->assertStatus(301)->assertRedirect('http://localhost/giving');
+
+    // The entry's own request then ends in Statamic's 404 and no rule matches it
+    $this->get('/giving')->assertStatus(404)->assertSee('NOT FOUND PAGE');
+})->with([
+    'an entry redirecting to itself' => [function (): StatamicEntry {
+        $giving = notFoundDestination();
+        notFoundRedirectEntry($giving, $giving);
+
+        return $giving;
+    }],
+    'two entries redirecting to each other' => [function (): StatamicEntry {
+        $giving = notFoundDestination();
+        $archive = notFoundDestination(slug: 'archive');
+        notFoundRedirectEntry($giving, $archive);
+        notFoundRedirectEntry($archive, $giving);
+
+        return $giving;
+    }],
+]);
+
+it('answers the 404 of an entry whose redirect loops with the rule for its path', function (): void {
+    $giving = notFoundDestination();
+    notFoundRedirectEntry($giving, $giving);
+    notFoundRules([notFoundRule('/giving')]);
+
+    $this->get('/giving')->assertStatus(301)->assertRedirect('https://uamshealth.com/destination');
+});
 
 it('renders the 404 page for a url rule with no target, or a target of no known type', function (array $overrides): void {
     /** @var array<string, mixed> $overrides */

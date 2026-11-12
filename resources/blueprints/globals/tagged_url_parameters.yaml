@@ -1,0 +1,197 @@
+tabs:
+  main:
+    display: Parameters
+    sections:
+      -
+        display: 'Standard parameters'
+        instructions: 'The Google Analytics campaign parameters a tagged URL carries. Google asks for utm_source, utm_medium and utm_campaign on every tagged URL.'
+        fields:
+          -
+            handle: standard_parameters
+            field:
+              type: checkboxes
+              display: 'Standard parameters'
+              hide_display: true
+              inline: false
+              localizable: false
+              options:
+                utm_id: utm_id
+                utm_source: utm_source
+                utm_medium: utm_medium
+                utm_campaign: utm_campaign
+                utm_source_platform: utm_source_platform
+                utm_term: utm_term
+                utm_content: utm_content
+                utm_creative_format: utm_creative_format
+                utm_marketing_tactic: utm_marketing_tactic
+      -
+        display: 'Custom parameters'
+        instructions: 'Parameters beside the standard ones. Each takes its value from a request field, a lookup list or a fixed value.'
+        fields:
+          -
+            handle: custom_parameters
+            field:
+              type: grid
+              display: 'Custom parameters'
+              hide_display: true
+              mode: stacked
+              add_row: 'Add parameter'
+              reorderable: true
+              localizable: false
+              fields:
+                -
+                  handle: enabled
+                  field:
+                    type: toggle
+                    display: Enabled
+                    instructions: 'Off leaves the parameter out of every new URL.'
+                    default: true
+                    width: 33
+                -
+                  handle: name
+                  field:
+                    type: text
+                    display: 'Name in the URL'
+                    instructions: 'Letters, numbers and underscores.'
+                    placeholder: org_unit
+                    validate:
+                      - required
+                      - 'regex:/^[A-Za-z0-9_]+$/'
+                    width: 66
+                -
+                  handle: order
+                  field:
+                    type: integer
+                    display: Order
+                    instructions: 'Position in the URL, lowest first.'
+                    default: 0
+                    width: 33
+                -
+                  handle: source_type
+                  field:
+                    type: button_group
+                    display: 'Value comes from'
+                    default: list
+                    options:
+                      request_field: 'A request field'
+                      list: 'A lookup list'
+                      fixed_value: 'A fixed value'
+                    width: 66
+                -
+                  handle: request_field
+                  field:
+                    type: text
+                    display: 'Request field'
+                    instructions: 'The handle of the request form field.'
+                    if:
+                      source_type: 'equals request_field'
+                -
+                  handle: list
+                  field:
+                    type: entries
+                    display: List
+                    collections:
+                      - lookup_lists
+                    max_items: 1
+                    mode: default
+                    create: false
+                    if:
+                      source_type: 'equals list'
+                -
+                  handle: fixed_value
+                  field:
+                    type: text
+                    display: 'Fixed value'
+                    if:
+                      source_type: 'equals fixed_value'
+  fallbacks:
+    display: 'Generic lists'
+    sections:
+      -
+        display: 'Generic list for each step'
+        instructions: 'Used by a step when no choice made so far names a list for it.'
+        fields:
+          -
+            handle: fallback_source_platform
+            field:
+              type: entries
+              display: 'Source platform generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_medium
+            field:
+              type: entries
+              display: 'Medium generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_creative_format
+            field:
+              type: entries
+              display: 'Creative format generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_specifications
+            field:
+              type: entries
+              display: 'Specifications generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_placement
+            field:
+              type: entries
+              display: 'Placement generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_term
+            field:
+              type: entries
+              display: 'Term generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
+            handle: fallback_content
+            field:
+              type: entries
+              display: 'Content generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50

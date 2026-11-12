@@ -14,16 +14,15 @@ use UAMSWeb\Aether\Redirects\Support\RedirectPattern;
  * its trailing slash, the URI gains one before the prefix test, and the appended
  * remainder is read in the request's original case.
  *
- * Mutation: 97.22% on UAMSWeb\Aether\Redirects\Support\RedirectPattern (72 mutants,
- * --covered-only). Both survivors sit in the private compiles() probe and are
- * left deliberately. `preg_match($pattern, '')` -> a non-empty subject is a true
- * equivalent mutant: the subject cannot change whether a pattern *compiles*.
- * `set_error_handler(fn () => true)` -> `false` is not equivalent — returning
- * false lets PHP's internal handler run, so the compile warning reaches the
- * error log — but it is unobservable from the caller, because a user-defined
- * handler replaces rather than chains, so the outer handler never sees it either
- * way. That
- * is exactly what the two probe tests below assert, so neither can kill it.
+ * Mutation: the class is mutation-clean in the closing run recorded on UAMS-Web/aether-redirects#54.
+ * Two survivors are annotated in `RedirectPattern` as equivalent: the empty subject in the
+ * private `compiles()` probe, because the subject cannot change whether a pattern compiles, and
+ * the early return after `freeDelimiter()`, because appending the modifiers cannot make a source
+ * that failed to compile as delimited compile. The bare-pattern delimiter list is a constant
+ * initializer PCOV reports as uncovered, so the delimiter dataset below pins it.
+ * `set_error_handler(fn () => true)` -> `false` is killed by the display-output test: returning
+ * false lets PHP's internal handler run, which prints the compile warning when `display_errors`
+ * is on, where the caller's own handler never sees it either way.
  *
  * @command  vendor/bin/pest tests/Unit/Support/RedirectPatternTest.php
  */
@@ -202,3 +201,41 @@ it('leaves an author-chosen absolute target at its own scope', function (string 
     'protocol-relative target' => ['//example.test/$1'],
     'mailto scheme' => ['mailto:someone@example.test'],
 ]);
+
+it('wraps a bare pattern in the first delimiter it does not contain', function (string $source, string $delimiter): void {
+    // Each case takes the previous candidates, so the dataset walks the whole list in order.
+    expect(RedirectPattern::compile($source))->toBe($delimiter.$source.$delimiter.'i');
+})->with([
+    'at sign' => ['^/a', '@'],
+    'hash' => ['^/a@b', '#'],
+    'tilde' => ['^/a@#b', '~'],
+    'bang' => ['^/a@#~b', '!'],
+    'percent' => ['^/a@#~!b', '%'],
+    'pipe' => ['^/a@#~!%b', '|'],
+]);
+
+it('refuses a bare pattern that contains every candidate delimiter', function (): void {
+    expect(RedirectPattern::compile('^/a@#~!%|b'))->toBeNull();
+});
+
+it('prints no warning while probing a pattern that will not compile', function (): void {
+    // A handler that answers false hands the warning to PHP's own, which prints it when
+    // `display_errors` is on. The probe must absorb it: nothing reaches the output.
+    $display = ini_set('display_errors', '1');
+    $logging = ini_set('log_errors', '0');
+    $reporting = error_reporting(E_ALL);
+
+    ob_start();
+
+    try {
+        $result = RedirectPattern::compile('^/broken/(.+');
+    } finally {
+        $printed = (string) ob_get_clean();
+        error_reporting($reporting);
+        ini_set('display_errors', (string) $display);
+        ini_set('log_errors', (string) $logging);
+    }
+
+    expect($result)->toBeNull()
+        ->and($printed)->toBe('');
+});

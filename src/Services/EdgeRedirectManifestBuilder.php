@@ -65,6 +65,9 @@ final readonly class EdgeRedirectManifestBuilder
     /**
      * The manifest format version, bumped when a field changes meaning.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the manifest `version` assertions in `EdgeRedirectManifestBuilderTest` and `EdgeRedirectManifestTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     public const int VERSION = 1;
 
     /**
@@ -73,6 +76,9 @@ final readonly class EdgeRedirectManifestBuilder
      *
      * @var list<int>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the response dataset in `EdgeRedirectManifestBuilderTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger
     private const array EDGE_REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 
     /**
@@ -88,6 +94,9 @@ final readonly class EdgeRedirectManifestBuilder
     /**
      * The engine's default for a rule with no stored order.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the unordered-rule ordering test in `EdgeRedirectManifestBuilderTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     private const int DEFAULT_ORDER = 30;
 
     /**

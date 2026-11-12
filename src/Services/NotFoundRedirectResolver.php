@@ -57,6 +57,9 @@ class NotFoundRedirectResolver
      *
      * @var list<int>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the redirect-status dataset in `NotFoundRedirectsTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger
     private const array REDIRECT_STATUSES = [302, 303, 307, 308];
 
     /**
@@ -65,6 +68,9 @@ class NotFoundRedirectResolver
      *
      * @var list<int>
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the site-rendered-status dataset in `NotFoundRedirectsTest` pins it.
+    // @pest-mutate-ignore:RemoveArrayItem,IncrementInteger,DecrementInteger
     private const array SITE_RENDERED_STATUSES = [403, 410, 451];
 
     /**

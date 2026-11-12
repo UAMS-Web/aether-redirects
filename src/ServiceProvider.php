@@ -24,6 +24,7 @@ use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 
 /**
  * Service provider for the add-on.
@@ -42,9 +43,8 @@ class ServiceProvider extends AddonServiceProvider
      *
      * @var array{input: list<string>, publicDirectory: string}
      */
-    // A property default is evaluated when the class compiles, so the coverage
-    // driver never attributes these lines to a test and every item reads as
-    // uncovered whatever the suite does. Statamic reads the value at boot.
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and `ViteBuildTest` and `ServiceProviderTest` pins it.
     // @pest-mutate-ignore:RemoveArrayItem
     protected $vite = [
         'input' => [
@@ -75,6 +75,7 @@ class ServiceProvider extends AddonServiceProvider
 
         $this->answerNotFoundWithRedirects();
         $this->provideRedirectsBlueprint();
+        $this->provideParametersBlueprint();
 
         $this->bootMarketingRedirectPermissions();
         $this->bootMarketingRedirectRoutes();
@@ -178,12 +179,38 @@ class ServiceProvider extends AddonServiceProvider
      */
     private function provideRedirectsBlueprint(): void
     {
-        $path = __DIR__.'/../resources/blueprints/globals/'.NotFoundRedirectResolver::GLOBAL_HANDLE.'.yaml';
+        $this->provideGlobalBlueprint(NotFoundRedirectResolver::GLOBAL_HANDLE);
+    }
+
+    /**
+     * Serve the `tagged_url_parameters` global set's blueprint from this package when
+     * the host has none of its own (UAMS-Web/aether-redirects#51).
+     *
+     * The lists and options collections get no blueprint from here. Statamic reads a
+     * collection's entry blueprints from files only, with no fallback to fall back on,
+     * and registering this package's directory for them would make Statamic ignore a
+     * host's own. Their blueprints are `docs/blueprints/lookup_list.yaml` and
+     * `docs/blueprints/lookup_option.yaml`, for the host's content repository to copy.
+     */
+    private function provideParametersBlueprint(): void
+    {
+        $this->provideGlobalBlueprint(TaggedUrlLookup::PARAMETERS_GLOBAL);
+    }
+
+    /**
+     * Serve a global set's blueprint from `resources/blueprints/globals`, which
+     * Statamic uses only when the host has no blueprint file of its own for the set.
+     *
+     * @param  string  $handle  The global set's handle.
+     */
+    private function provideGlobalBlueprint(string $handle): void
+    {
+        $path = __DIR__.'/../resources/blueprints/globals/'.$handle.'.yaml';
 
         // Resolved as the concrete repository rather than through the `Blueprint`
         // facade, whose `setFallback()` docblock leaves `Closure` unimported
         app(BlueprintRepository::class)->setFallback(
-            'globals.'.NotFoundRedirectResolver::GLOBAL_HANDLE,
+            'globals.'.$handle,
             function () use ($path): StatamicBlueprint {
                 $blueprint = new StatamicBlueprint;
                 $blueprint->setContents(YAML::file($path)->parse());

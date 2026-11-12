@@ -32,8 +32,14 @@ use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
  */
 class RedirectRuleMatcher
 {
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the exact-limit pattern test in `RedirectRuleMatcherTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     private const int MAX_REDIRECT_REGEX_PATTERN_BYTES = 1024;
 
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the exact-limit subject test in `RedirectRuleMatcherTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     private const int MAX_REDIRECT_REGEX_SUBJECT_BYTES = 4096;
 
     // Moving either step limit by one is not observable. A test would need a pattern whose
@@ -367,28 +373,12 @@ class RedirectRuleMatcher
 
         // Append every default redirect whose source the requested site does not define
         foreach ($defaultRedirects as $redirect) {
-            // KNOWN SURVIVOR, DELIBERATELY NOT ANNOTATED. This condition carries two `&&`, and
-            // `BooleanAndToBooleanOr` mutates each of them separately:
-            //
-            //   inner   `(isset($s) || is_string($s)) && isset($siteSources[$s])`   EQUIVALENT
-            //   outer   `(isset($s) && is_string($s)) || isset($siteSources[$s])`   killed by tests
-            //
-            // The inner one is equivalent because its two operands cannot disagree in a way the
-            // conjunction can observe: a set string key makes both true, an absent key makes both
-            // false, and a set non-string key leaves the third operand deciding — `isset()` on an
-            // illegal offset being false rather than an error. So it survives and no input kills it.
-            //
-            // It is NOT annotated, because `@pest-mutate-ignore` selects by mutator NAME and cannot
-            // distinguish two instances of one mutator on the same node. Annotating it here also
-            // suppresses the outer mutation, which the suite does kill — measured: with the
-            // annotation the node yields one mutant, without it two, one killed and one surviving.
-            // Silencing a killed mutant would hide the coverage that kills it, so the survivor is
-            // recorded here instead. Kill it by restructuring the condition, not by annotating it.
-            if (
-                isset($redirect['source'])
-                && \is_string($redirect['source'])
-                && isset($siteSources[$redirect['source']])
-            ) {
+            // A source that is not a string is never a key the requested site defined, and a null or
+            // missing one is the same case. Reading it once and testing the string type first keeps
+            // the lookup below to a string key.
+            $source = $redirect['source'] ?? null;
+
+            if (\is_string($source) && isset($siteSources[$source])) {
                 // The requested site overrides this source — skip the default row
                 continue;
             }
@@ -653,28 +643,12 @@ class RedirectRuleMatcher
 
             // Set the recursion limit to the maximum allowed value
             //
-            // Removing this call is equivalent while the two bounds are equal. `pcre.backtrack_limit`
-            // caps how many match steps PCRE takes and `pcre.recursion_limit` caps how deep it goes,
-            // and a depth of N cannot be reached in fewer than N steps -- so with both set to the
-            // same value the step limit is reached no later than the depth limit, and
-            // PREG_RECURSION_LIMIT_ERROR never surfaces. Probed at these limits with four
-            // catastrophic shapes inside the byte bounds enforced above: every one returned
-            // PREG_BACKTRACK_LIMIT_ERROR, and the same shapes DO return PREG_RECURSION_LIMIT_ERROR
-            // once the depth limit alone is lowered, so the probe can tell the two apart. Measured
-            // with the call removed: 131 passed (725 assertions) across the three redirect suites,
-            // identical to the pristine run. The equivalence is bounded to an ambient depth limit at
-            // or above this one -- a process configured lower would be a different case.
-            //
-            // The RemoveFunctionCall mutant is therefore equivalent and is NOT annotated, because
-            // it cannot be. That mutator removes the ini_set() statement itself, and an annotation
-            // reaches the node's CHILDREN rather than the node it is attached to -- so naming it
-            // here generates the mutant and reports it as surviving while reading as suppressed,
-            // which is worse than leaving it visible. RemoveStringCast is a different case and is
-            // annotated: it targets the cast inside the call, which is a child. Measured on the
-            // merged state: of 197 covered mutants only this one and the BooleanAndToBooleanOr in
-            // mergeDefaultRedirects() survive, and the same mutator is killed at all three
-            // unannotated ini_set() calls in this method, so it is generated and killable here and
-            // simply is not equivalent at those three.
+            // The two limits bound different things: `pcre.backtrack_limit` caps match steps and
+            // `pcre.recursion_limit` caps depth. A depth of N cannot be reached in fewer than N steps,
+            // so with both set to the same value the step limit is reached no later than the depth
+            // limit, and removing this call changes no redirect's outcome. That is why the redirect
+            // suites cannot see it. The limit itself is observable: `RedirectRuleMatcherTest` reads
+            // `pcre.recursion_limit` from inside the operation and after it.
             // @pest-mutate-ignore:RemoveStringCast
             ini_set(
                 'pcre.recursion_limit',
