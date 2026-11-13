@@ -98,3 +98,9 @@ parameters:
         -
             identifier: trait.unused
             path: tests/Support/IsolatesStache.php
+        # Outside a test file, `test()` is typed as a proxy or a pending call, and
+        # the proxy, which Pest marks internal, is the only public way to the
+        # running test case. The helper asserts both types at run time.
+        -
+            identifier: classConstant.internalClass
+            path: tests/Support/MarketingRedirectDomainHelpers.php

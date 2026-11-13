@@ -56,6 +56,7 @@ final readonly class MarketingRedirect
      * @param  string|null  $notes  Free-text notes (e.g. why the redirect exists)
      * @param  string|null  $submittedBy  The Control Panel user id that created the request (for the no-self-approve gate, UAMS-Web/uams-statamic-archive#1357)
      * @param  string|null  $host  The redirect domain the rule serves on, or null for the main site's `redirects` global (UAMS-Web/aether-redirects#83)
+     * @param  bool  $generatedBackHalf  Whether the source is a generated back-half rather than a path the requester typed (UAMS-Web/aether-redirects#15)
      */
     public function __construct(
         public string $source,
@@ -66,6 +67,7 @@ final readonly class MarketingRedirect
         public ?string $notes = null,
         public ?string $submittedBy = null,
         public ?string $host = null,
+        public bool $generatedBackHalf = false,
     ) {}
 
     /**
@@ -94,6 +96,31 @@ final readonly class MarketingRedirect
             notes: self::cleanOptional($input['notes'] ?? null),
             submittedBy: self::cleanOptional($submittedBy),
             host: RedirectHosts::normalize($input['host'] ?? null),
+        );
+    }
+
+    /**
+     * Return this redirect with a generated back-half as its source
+     * (UAMS-Web/aether-redirects#15).
+     *
+     * The back-half keeps its drawn case; the source gains the leading slash
+     * every stored source carries.
+     *
+     * @param  string  $backHalf  The generated back-half
+     * @return self The same redirect, sourced from the back-half and marked generated
+     */
+    public function withGeneratedBackHalf(string $backHalf): self
+    {
+        return new self(
+            source: RedirectSource::normalize($backHalf),
+            destination: $this->destination,
+            response: $this->response,
+            window: $this->window,
+            requester: $this->requester,
+            notes: $this->notes,
+            submittedBy: $this->submittedBy,
+            host: $this->host,
+            generatedBackHalf: true,
         );
     }
 
@@ -140,8 +167,9 @@ final readonly class MarketingRedirect
      * (UAMS-Web/aether-redirects#83).
      *
      * The same fields as {@see toRow()} without the replicator `id` and `type`, plus
-     * the `host` the entry answers on (the id of its domain record), so the engine and the edge manifest apply
-     * the same status and validity gates to it as to a global-set row.
+     * the `host` the entry answers on (the id of its domain record), so the engine and
+     * the edge manifest apply the same status and validity gates to it as to a
+     * global-set row, and the {@see BackHalf::FIELD} flag the approval re-check reads.
      *
      * @param  string  $host  The id of the domain record the rule serves on
      * @return array<string, mixed> The entry data
@@ -153,7 +181,7 @@ final readonly class MarketingRedirect
         $row = $this->toRow('');
         unset($row['id'], $row['type']);
 
-        return ['host' => $host, 'whole_domain' => false, ...$row];
+        return ['host' => $host, 'whole_domain' => false, ...$row, BackHalf::FIELD => $this->generatedBackHalf];
     }
 
     /**

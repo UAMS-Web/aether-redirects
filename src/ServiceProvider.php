@@ -26,6 +26,8 @@ use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
+use UAMSWeb\Aether\Redirects\Support\BackHalf;
+use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 
 /**
@@ -55,6 +57,17 @@ class ServiceProvider extends AddonServiceProvider
         ],
         'publicDirectory' => 'resources/dist',
     ];
+
+    /**
+     * Register the add-on's container bindings.
+     *
+     * Binds the generator a vanity URL request draws its back-half with
+     * (UAMS-Web/aether-redirects#15), so a host or a test can replace it.
+     */
+    public function register(): void
+    {
+        $this->app->bind(BackHalf::GENERATOR, static fn (): RandomCode => BackHalf::generator());
+    }
 
     /**
      * Boot the add-on once Statamic has booted.

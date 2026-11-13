@@ -1,5 +1,5 @@
 <script setup>
-import { getCurrentInstance, ref, watch } from 'vue';
+import { computed, getCurrentInstance, ref, watch } from 'vue';
 import { Head } from '@statamic/cms/inertia';
 import { Header, Panel, Button } from '@statamic/cms/ui';
 
@@ -16,6 +16,9 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * (UAMS-Web/aether-redirects#83). The screen proposes the domain a destination
  * calls for, the way the server checks it: a `uams.edu` page goes on `uams.info`
  * and a `uamshealth.com` page on `uams.health`.
+ *
+ * On a vanity domain the source may be left blank, and the server generates a
+ * 7-character back-half for it (UAMS-Web/aether-redirects#15).
  */
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
@@ -26,6 +29,8 @@ const props = defineProps({
     hostOptions: { type: Array, default: () => [] },
     // Whether the current user can approve, and so can save a domain that does not suit the destination
     canApprove: { type: Boolean, default: false },
+    // Domains where a blank source asks the server to generate a back-half
+    generatedHosts: { type: Array, default: () => [] },
 });
 
 const instance = getCurrentInstance().proxy;
@@ -78,6 +83,9 @@ watch(
         }
     },
 );
+
+// Whether the chosen domain generates a back-half when the source is left blank.
+const generatesBackHalf = computed(() => props.generatedHosts.includes(form.value.host));
 
 const inputClass =
     'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ' +
@@ -154,10 +162,13 @@ async function submit() {
                         v-model="form.source"
                         type="text"
                         :class="inputClass"
-                        placeholder="/flu-shot"
+                        :placeholder="generatesBackHalf ? __('Leave blank to generate one') : '/flu-shot'"
                         autocomplete="off"
                     />
-                    <p class="mt-1 text-xs text-gray-500">{{ __('The path to redirect from, relative to the site root.') }}</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('The path to redirect from, relative to the site root.') }}
+                        <span v-if="generatesBackHalf">{{ __('Leave it blank to get a generated 7-character back-half, shown when the request is submitted.') }}</span>
+                    </p>
                     <p v-if="errorFor('source')" class="mt-1 text-xs text-red-600" v-text="errorFor('source')" />
                 </div>
 
