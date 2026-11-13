@@ -158,3 +158,56 @@ it('returns null when every stored row is skipped or non-overlapping', function 
         ],
     ))->toBeNull();
 });
+
+/**
+ * A stored row on a host.
+ *
+ * @return array<string, mixed>
+ */
+function hostedCollisionRow(?string $host, string $source, ?string $from = null, ?string $until = null): array
+{
+    return [...collisionRow($source, $from, $until), 'host' => $host];
+}
+
+it('does not collide the same path on another host or on the main site', function (): void {
+    $detector = new RedirectCollisionDetector;
+    $rows = [hostedCollisionRow('uams.info', '/flu'), collisionRow('/flu')];
+
+    expect($detector->firstConflict('/flu', new ValidityWindow, $rows, 'uams.health'))->toBeNull()
+        ->and($detector->firstConflict('/flu', new ValidityWindow, [hostedCollisionRow('uams.info', '/flu')]))->toBeNull()
+        ->and($detector->firstConflict('/flu', new ValidityWindow, [collisionRow('/flu')], 'uams.info'))->toBeNull();
+});
+
+it('collides the same path on the same host, whatever the case of the host', function (): void {
+    $detector = new RedirectCollisionDetector;
+
+    $conflict = $detector->firstConflict('/Flu', new ValidityWindow, [hostedCollisionRow('UAMS.info.', '/flu')], 'uams.info');
+
+    expect($conflict)->not->toBeNull();
+});
+
+it('holds a path on a vanity host for 12 weeks after the last day of a rule', function (string $from, bool $conflicts): void {
+    $detector = new RedirectCollisionDetector;
+    $rows = [hostedCollisionRow('uams.info', '/flu', '2026-01-01', '2026-01-31')];
+
+    $conflict = $detector->firstConflict('/flu', ValidityWindow::fromDates($from, null), $rows, 'uams.info');
+
+    expect($conflict !== null)->toBe($conflicts);
+})->with([
+    'the day after' => ['2026-02-01', true],
+    '83 days after' => ['2026-04-24', true],
+    '84 days after' => ['2026-04-25', false],
+]);
+
+it('holds no buffer on a host that is not a vanity host', function (): void {
+    $detector = new RedirectCollisionDetector;
+    $rows = [hostedCollisionRow('go.uams.edu', '/flu', '2026-01-01', '2026-01-31')];
+
+    expect($detector->firstConflict('/flu', ValidityWindow::fromDates('2026-02-01', null), $rows, 'go.uams.edu'))->toBeNull();
+});
+
+it('holds no buffer on the main site', function (): void {
+    $detector = new RedirectCollisionDetector;
+
+    expect($detector->firstConflict('/flu', ValidityWindow::fromDates('2026-02-01', null), [collisionRow('/flu', '2026-01-01', '2026-01-31')]))->toBeNull();
+});

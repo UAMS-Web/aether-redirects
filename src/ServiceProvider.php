@@ -24,6 +24,7 @@ use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 
 /**
@@ -149,7 +150,7 @@ class ServiceProvider extends AddonServiceProvider
             // Show the review queue, with its pending count, to approvers
             if ($user->can(MarketingRedirectController::APPROVE_PERMISSION)) {
                 // Read the pending count once so approvers see outstanding work in the nav
-                $pending = app(MarketingRedirectStore::class)->pendingCount();
+                $pending = app(MarketingRedirectStore::class)->pendingCount() + count(app(RedirectDomainStore::class)->pending());
 
                 $label = $pending > 0
                     ? sprintf('%s (%d)', __('Review Redirects'), $pending)

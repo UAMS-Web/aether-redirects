@@ -10,11 +10,16 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\User;
 use Statamic\Http\Controllers\CP\CpController;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
+use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
+use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 
 /**
@@ -29,6 +34,11 @@ use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
  * separate `approve marketing redirects` permission, and a creator may never
  * review their own request. There is no public creation path in this slice (the
  * #56 trust-boundary decision).
+ *
+ * A request with a `host` is an entry of the `redirect_domains` collection that
+ * serves on that vanity domain; one without is a row of the `redirects` global
+ * that serves on the main site's 404 path (UAMS-Web/aether-redirects#83). Both
+ * go through the same approval workflow, and the review queue lists both.
  */
 class MarketingRedirectController extends CpController
 {
@@ -50,9 +60,12 @@ class MarketingRedirectController extends CpController
         // Only staff granted the redirect permission may open the utility.
         $this->authorize(self::PERMISSION);
 
-        // Hand the Vue screen its POST target and the redirect-type options.
+        // Hand the Vue screen its POST target, the redirect-type options and the
+        // domains a request can be made for.
         return Inertia::render('aether-redirects::MarketingRedirectCreate', [
             'storeUrl' => cp_route('marketing-redirects.store'),
+            'hostOptions' => $this->hostOptions(),
+            'canApprove' => $this->canApprove(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
                 ['value' => '302', 'label' => __('302 Found')],
@@ -65,7 +78,8 @@ class MarketingRedirectController extends CpController
      */
     public function store(
         Request $request,
-        MarketingRedirectStore $store,
+        MarketingRedirectStore $globalStore,
+        RedirectDomainStore $domainStore,
         RedirectCollisionDetector $detector
     ): JsonResponse {
         // Gate the write behind the same permission as the screen.
@@ -86,6 +100,17 @@ class MarketingRedirectController extends CpController
             );
         }
 
+        // A request for a redirect domain must name a domain the application knows,
+        // and pair it with a destination that domain serves unless an approver saves it.
+        $hostError = $this->hostError($request, $redirect);
+
+        if ($hostError instanceof JsonResponse) {
+            return $hostError;
+        }
+
+        // The domain's entries hold a domain request; the global holds a main-site one.
+        $store = $redirect->host === null ? $globalStore : $domainStore;
+
         // Surface a same-source collision within an overlapping window (UAMS-Web/uams-statamic-archive#1356),
         // but only against redirects that serve or may yet serve. A rejected
         // request is retained for the record and never serves (UAMS-Web/uams-statamic-archive#1357), so it must
@@ -94,7 +119,8 @@ class MarketingRedirectController extends CpController
         $conflict = $detector->firstConflict(
             $redirect->source,
             $redirect->window,
-            $this->collisionCandidates($store)
+            $this->collisionCandidates($store),
+            $redirect->host
         );
 
         if ($conflict !== null) {
@@ -107,7 +133,9 @@ class MarketingRedirectController extends CpController
         // Report success with the stored row for the screen to confirm.
         return response()->json([
             'saved' => true,
-            'message' => __('Redirect submitted for review. It serves on a 404 for every site once an approver approves it.'),
+            'message' => $redirect->host === null
+                ? __('Redirect submitted for review. It serves on a 404 for every site once an approver approves it.')
+                : __('Redirect submitted for review. It serves on :host once an approver approves it.', ['host' => $redirect->host]),
             'redirect' => $row,
         ], 201);
     }
@@ -115,26 +143,27 @@ class MarketingRedirectController extends CpController
     /**
      * Render the review queue of redirects awaiting approval (UAMS-Web/uams-statamic-archive#1357).
      */
-    public function index(MarketingRedirectStore $store): InertiaResponse
+    public function index(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): InertiaResponse
     {
         // Only approvers may open the review queue.
         $this->authorize(self::APPROVE_PERMISSION);
 
         // Hand the Vue screen the pending requests, each with its action URLs.
         return Inertia::render('aether-redirects::MarketingRedirectReview', [
-            'redirects' => $this->pendingPayload($store),
+            'redirects' => $this->pendingPayload($globalStore, $domainStore),
         ]);
     }
 
     /**
      * Approve a pending redirect so it begins serving (UAMS-Web/uams-statamic-archive#1357).
      */
-    public function approve(string $redirect, MarketingRedirectStore $store): JsonResponse
+    public function approve(string $redirect, MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): JsonResponse
     {
         // Only approvers may approve, and never their own request.
         $this->authorize(self::APPROVE_PERMISSION);
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
+        $store = $this->storeHolding($redirect, $globalStore, $domainStore);
         $error = $this->guardReviewable($redirect, $store);
 
         if ($error instanceof JsonResponse) {
@@ -149,7 +178,9 @@ class MarketingRedirectController extends CpController
 
         return response()->json([
             'saved' => true,
-            'message' => __('Redirect approved. It now serves on a 404 for every site.'),
+            'message' => $store instanceof RedirectDomainStore
+                ? __('Redirect approved. It now serves on its domain.')
+                : __('Redirect approved. It now serves on a 404 for every site.'),
             'redirect' => $row,
         ]);
     }
@@ -157,8 +188,12 @@ class MarketingRedirectController extends CpController
     /**
      * Reject a pending redirect, retaining the reason for the record (UAMS-Web/uams-statamic-archive#1357).
      */
-    public function reject(Request $request, string $redirect, MarketingRedirectStore $store): JsonResponse
-    {
+    public function reject(
+        Request $request,
+        string $redirect,
+        MarketingRedirectStore $globalStore,
+        RedirectDomainStore $domainStore
+    ): JsonResponse {
         // Only approvers may reject, and never their own request.
         $this->authorize(self::APPROVE_PERMISSION);
 
@@ -169,6 +204,7 @@ class MarketingRedirectController extends CpController
         ]);
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
+        $store = $this->storeHolding($redirect, $globalStore, $domainStore);
         $error = $this->guardReviewable($redirect, $store);
 
         if ($error instanceof JsonResponse) {
@@ -191,11 +227,11 @@ class MarketingRedirectController extends CpController
      * Validate the create request.
      *
      * @param  Request  $request  The incoming create request
-     * @return array{source: string, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null}
+     * @return array{source: string, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null}
      */
     private function validateInput(Request $request): array
     {
-        /** @var array{source: string, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null} $validated */
+        /** @var array{source: string, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null} $validated */
         $validated = $request->validate([
             'source' => ['required', 'string', 'max:2048'],
             'destination' => ['required', 'string', 'max:2048'],
@@ -204,6 +240,7 @@ class MarketingRedirectController extends CpController
             'valid_until' => ['nullable', 'date'],
             'requester' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2048'],
+            'host' => ['nullable', 'string'],
         ]);
 
         // Normalize optional keys to a stable shape for MarketingRedirect::fromInput().
@@ -215,6 +252,7 @@ class MarketingRedirectController extends CpController
             'valid_until' => $validated['valid_until'] ?? null,
             'requester' => $validated['requester'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'host' => $validated['host'] ?? null,
         ];
     }
 
@@ -246,6 +284,13 @@ class MarketingRedirectController extends CpController
         // is a string matching the candidate.
         // @pest-mutate-ignore:EmptyStringToNotEmpty
         $source = \is_string($conflict['source'] ?? null) ? $conflict['source'] : '';
+        $host = RedirectHosts::normalize($conflict['host'] ?? null);
+
+        // A rule on a redirect domain is named with its domain.
+        if ($host !== null) {
+            $source = $host.$source;
+        }
+
         $target = \is_string($conflict['target_url'] ?? null) ? $conflict['target_url'] : null;
 
         if ($target !== null && $target !== '') {
@@ -283,10 +328,11 @@ class MarketingRedirectController extends CpController
      * a `can_review` flag — false for a request the current user submitted, so
      * the screen can disable the actions the server also forbids (UAMS-Web/uams-statamic-archive#1357).
      *
-     * @param  MarketingRedirectStore  $store  The redirect store
+     * @param  MarketingRedirectStore  $globalStore  The main-site redirect store
+     * @param  RedirectDomainStore  $domainStore  The redirect domain store
      * @return list<array<string, mixed>> The pending requests ready for the screen
      */
-    private function pendingPayload(MarketingRedirectStore $store): array
+    private function pendingPayload(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): array
     {
         // Resolve the current approver once for the self-review comparison.
         $currentUserId = $this->currentUserId();
@@ -302,6 +348,7 @@ class MarketingRedirectController extends CpController
 
             return [
                 'id' => $id,
+                'host' => RedirectHosts::normalize($row['host'] ?? null),
                 'source' => \is_string($row['source'] ?? null) ? $row['source'] : '',
                 'destination' => \is_string($row['target_url'] ?? null) ? $row['target_url'] : '',
                 'response' => \is_string($row['response'] ?? null) ? $row['response'] : '301',
@@ -313,7 +360,7 @@ class MarketingRedirectController extends CpController
                 'approve_url' => cp_route('marketing-redirects.approve', ['redirect' => $id]),
                 'reject_url' => cp_route('marketing-redirects.reject', ['redirect' => $id]),
             ];
-        }, $store->pending());
+        }, [...$globalStore->pending(), ...$domainStore->pending()]);
     }
 
     /**
@@ -325,10 +372,10 @@ class MarketingRedirectController extends CpController
      * self-approve).
      *
      * @param  string  $id  The candidate redirect row id
-     * @param  MarketingRedirectStore  $store  The redirect store
+     * @param  RedirectRequestStore  $store  The store that holds, or would hold, the request
      * @return JsonResponse|null An error response, or null when the request is reviewable
      */
-    private function guardReviewable(string $id, MarketingRedirectStore $store): ?JsonResponse
+    private function guardReviewable(string $id, RedirectRequestStore $store): ?JsonResponse
     {
         // An unknown id has nothing to review.
         $row = $store->find($id);
@@ -365,10 +412,10 @@ class MarketingRedirectController extends CpController
      * it does not conflict — excluding it keeps the reject → correct → resubmit
      * loop open (a rejected source can be requested again).
      *
-     * @param  MarketingRedirectStore  $store  The redirect store
+     * @param  RedirectRequestStore  $store  The store the candidate would be saved in
      * @return list<array<string, mixed>> The rows eligible to collide
      */
-    private function collisionCandidates(MarketingRedirectStore $store): array
+    private function collisionCandidates(RedirectRequestStore $store): array
     {
         // Drop rejected rows; they are retained but never serve, so cannot conflict.
         // Reindexing is equivalent: the detector only iterates the rows.
@@ -377,6 +424,81 @@ class MarketingRedirectController extends CpController
             $store->all(),
             static fn (array $row): bool => RedirectStatus::fromRow($row) !== RedirectStatus::Rejected,
         ));
+    }
+
+    /**
+     * The store that holds a request.
+     *
+     * An id that is in neither store goes to the domain store, whose lookup reports it as not found.
+     *
+     * @param  string  $id  The request id
+     * @param  MarketingRedirectStore  $globalStore  The main-site redirect store
+     * @param  RedirectDomainStore  $domainStore  The redirect domain store
+     * @return RedirectRequestStore The store holding the request, or the domain store when none does
+     */
+    private function storeHolding(string $id, MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): RedirectRequestStore
+    {
+        return $globalStore->find($id) === null ? $domainStore : $globalStore;
+    }
+
+    /**
+     * The error for a request whose domain is unknown or does not suit its destination.
+     *
+     * A submitted domain that is not a valid host, or is not a vanity domain or a
+     * domain the collection already serves, is refused outright. A vanity domain
+     * paired with a destination it does not serve is refused unless the user can
+     * approve, since an approver is who may allow the exception (UAMS-Web/aether-redirects#83).
+     *
+     * @param  Request  $request  The incoming create request
+     * @param  MarketingRedirect  $redirect  The redirect built from it
+     * @return JsonResponse|null A 422, or null when the domain is acceptable
+     */
+    private function hostError(Request $request, MarketingRedirect $redirect): ?JsonResponse
+    {
+        $submitted = $request->input('host');
+
+        // No domain means a main-site request; a domain that does not parse is an error, never a silent main-site save.
+        if ($redirect->host === null) {
+            return \is_string($submitted) && trim($submitted) !== ''
+                ? $this->unprocessable('host', __('Enter a valid domain, such as uams.info.'))
+                : null;
+        }
+
+        // Both sides are normalized host strings, which compare the same loosely or strictly
+        // @pest-mutate-ignore:TrueToFalse
+        if (! \in_array($redirect->host, $this->hostOptions(), true)) {
+            return $this->unprocessable('host', __(':host is not a redirect domain.', ['host' => $redirect->host]));
+        }
+
+        if (! RedirectHosts::accepts($redirect->host, $redirect->destination) && ! $this->canApprove()) {
+            return $this->unprocessable('host', __(':host does not serve this destination. An approver can save the exception.', ['host' => $redirect->host]));
+        }
+
+        return null;
+    }
+
+    /**
+     * The domains a request can be made for: the vanity domains and every domain the collection serves.
+     *
+     * @return list<string> The vanity domains, then the other domains the collection serves in alphabetical order
+     */
+    private function hostOptions(): array
+    {
+        // A host without the collection still offers the vanity domains, whose requests then fail on save
+        $served = CollectionFacade::findByHandle(RedirectDomainRules::COLLECTION) === null ? [] : RedirectDomainRules::publishedHosts();
+        sort($served);
+
+        return array_values(array_unique([...RedirectHosts::VANITY, ...$served]));
+    }
+
+    /**
+     * Whether the current user may approve requests.
+     */
+    private function canApprove(): bool
+    {
+        // Every caller runs behind the CP auth middleware, so there is always a current user and the null-safe call never short-circuits
+        // @pest-mutate-ignore:RemoveNullSafeOperator
+        return User::current()?->hasPermission(self::APPROVE_PERMISSION) === true;
     }
 
     /**

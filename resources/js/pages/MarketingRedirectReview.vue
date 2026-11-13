@@ -13,7 +13,7 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * forbids it, so this only disables the buttons. A reviewed row leaves the list.
  */
 const props = defineProps({
-    // Pending requests: [{ id, source, destination, response, requester, notes,
+    // Pending requests: [{ id, host, source, destination, response, requester, notes,
     // valid_from, valid_until, can_review, approve_url, reject_url }]
     redirects: { type: Array, default: () => [] },
 });
@@ -137,7 +137,7 @@ async function confirmReject(row) {
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="text-sm font-medium">
-                                    <code>{{ row.source }}</code>
+                                    <code>{{ row.host }}{{ row.source }}</code>
                                     <span class="text-gray-400">&rarr;</span>
                                     <code>{{ row.destination }}</code>
                                 </p>
