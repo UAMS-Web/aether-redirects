@@ -58,10 +58,12 @@ tabs:
             field:
               type: select
               display: Status
+              instructions: 'Set by the review queue. Read-only here, so the entry editor cannot approve a request without issuing its tagged URL.'
               options:
                 pending: Pending
                 approved: Approved
                 rejected: Rejected
+              visibility: read_only
               listable: true
               filterable: true
               width: 33
@@ -71,25 +73,25 @@ tabs:
               type: text
               display: 'Tagged URL'
               instructions: 'Issued when the request is approved.'
-              read_only: true
+              visibility: read_only
               listable: true
           -
             handle: submitted_by
             field:
               type: text
               display: 'Submitted by'
-              read_only: true
+              visibility: read_only
               width: 33
           -
             handle: reviewed_by
             field:
               type: text
               display: 'Reviewed by'
-              read_only: true
+              visibility: read_only
               width: 33
           -
             handle: rejection_reason
             field:
               type: textarea
               display: 'Rejection reason'
-              read_only: true
+              visibility: read_only

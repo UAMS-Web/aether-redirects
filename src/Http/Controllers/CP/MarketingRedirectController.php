@@ -226,6 +226,12 @@ class MarketingRedirectController extends CpController
             return $pending;
         }
 
+        // A tagged URL composed with no parameters defined would be the bare destination, issued for good;
+        // refuse and leave the request pending until the site defines them (UAMS-Web/aether-redirects#18).
+        if ($store instanceof TaggedUrlRequestStore && ! TaggedUrlRequestStore::canIssue()) {
+            return $this->unprocessable('tagged_url', __('Tagged URL parameters are not set up on this site, so no tagged URL can be issued yet.'));
+        }
+
         // A generated back-half goes live only if no approved rule on its domain has issued it meanwhile.
         $reissue = $this->reissueError($pending, $store);
 

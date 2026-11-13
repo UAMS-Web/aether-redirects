@@ -179,7 +179,9 @@ it('writes a review to the entry file, and clears an earlier rejection reason on
 
     $entry = Entry::find($id);
     Assert::assertInstanceOf(StatamicEntry::class, $entry);
-    $file = File::get($entry->path());
+    $path = $entry->path();
+    Assert::assertIsString($path);
+    $file = File::get($path);
 
     expect($file)->toContain('status: approved')
         ->and($file)->toContain('tagged_url:')

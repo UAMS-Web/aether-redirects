@@ -9,8 +9,10 @@ use RuntimeException;
 use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\Entry;
+use Statamic\Facades\GlobalSet;
 use Statamic\Stache\Query\EntryQueryBuilder;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 
 /**
@@ -75,7 +77,15 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
     }
 
     /**
-     * Every entry of the collection as a row, whatever its status, ordered by destination.
+     * Whether the host defines the parameters a tagged URL carries, without which approval would issue the bare destination.
+     */
+    public static function canIssue(): bool
+    {
+        return GlobalSet::findByHandle(TaggedUrlLookup::PARAMETERS_GLOBAL) !== null;
+    }
+
+    /**
+     * Every entry of the collection as a row, whatever its status, ordered by title (the destination when it was requested).
      *
      * @return list<array<string, mixed>>
      */

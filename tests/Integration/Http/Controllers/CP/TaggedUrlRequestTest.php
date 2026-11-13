@@ -348,7 +348,42 @@ it('does not change an issued tagged URL when the parameters change later', func
 
     turParameters(['standard_parameters' => []]);
 
-    expect(turField($id, TaggedUrlRequestStore::TAGGED_URL_FIELD))->toBe('https://www.uams.edu/flu?utm_campaign=flu-2026');
+    expect(turField($id, TaggedUrlRequestStore::TAGGED_URL_FIELD))->toBe('https://www.uams.edu/flu?utm_campaign=flu-2026')
+        ->and(app(TaggedUrlRequestStore::class)->find($id)[TaggedUrlRequestStore::TAGGED_URL_FIELD] ?? null)->toBe('https://www.uams.edu/flu?utm_campaign=flu-2026');
+});
+
+it('refuses to approve while the site defines no parameters, and leaves the request pending', function (): void {
+    $id = turId(turSubmit(mrdCreator()));
+
+    $global = GlobalSet::findByHandle(TaggedUrlLookup::PARAMETERS_GLOBAL);
+    Assert::assertInstanceOf(StatamicGlobalSet::class, $global);
+    $global->delete();
+
+    turReview(mrdApprover(), 'approve', $id)
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.tagged_url.0', 'Tagged URL parameters are not set up on this site, so no tagged URL can be issued yet.');
+
+    expect(turField($id, 'status'))->toBe('pending')
+        ->and(turField($id, TaggedUrlRequestStore::TAGGED_URL_FIELD))->toBeNull();
+
+    // A rejection needs no parameters
+    turReview(mrdApprover(), 'reject', $id, ['reason' => 'No campaign'])->assertOk();
+});
+
+it('ignores a status, tagged URL or submitter the requester sends', function (): void {
+    $creator = mrdCreator();
+
+    $id = turId(turSubmit($creator, [
+        'status' => 'approved',
+        TaggedUrlRequestStore::TAGGED_URL_FIELD => 'https://evil.example/',
+        'submitted_by' => 'someone-else',
+        'reviewed_by' => 'someone-else',
+    ])->assertCreated());
+
+    expect(turField($id, 'status'))->toBe('pending')
+        ->and(turField($id, TaggedUrlRequestStore::TAGGED_URL_FIELD))->toBeNull()
+        ->and(turField($id, 'submitted_by'))->toBe($creator->id())
+        ->and(turField($id, 'reviewed_by'))->toBeNull();
 });
 
 it('leaves every utm_ parameter off the issued URL when the request suppresses them', function (): void {
