@@ -234,6 +234,15 @@ it('lets the generic fallback list of each cascade step be chosen', function (st
         ->and($fallback->get('max_items'))->toBe(1);
 })->with(TaggedUrlLookup::STEPS);
 
+it('lets the channel list, the first choice of the cascade, be chosen', function (): void {
+    $channel = lookupField(lookupParametersBlueprint(), TaggedUrlLookup::CHANNEL_LIST_FIELD);
+
+    expect($channel->type())->toBe('entries')
+        ->and($channel->get('collections'))->toBe([TaggedUrlLookup::LISTS_COLLECTION])
+        ->and($channel->get('max_items'))->toBe(1)
+        ->and(TaggedUrlLookup::STEPS[0])->toBe('source');
+});
+
 it('offers a fallback field for exactly the steps an option can point at', function (): void {
     $fallbacks = collect(lookupFieldHandles(lookupParametersBlueprint()))
         ->filter(fn (string $handle): bool => str_starts_with($handle, 'fallback_'))

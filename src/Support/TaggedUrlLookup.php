@@ -31,15 +31,23 @@ final readonly class TaggedUrlLookup
     public const string PARAMETERS_GLOBAL = 'tagged_url_parameters';
 
     /**
+     * The field on the parameters global that names the list of marketing channels,
+     * the first choice of the cascade (UAMS-Web/aether-redirects#26). A channel option
+     * names the source list through its `source` pointer.
+     */
+    public const string CHANNEL_LIST_FIELD = 'channel_list';
+
+    /**
      * The cascade steps an option can point downstream at, in cascade order. Each is
      * a field handle on an option, and `fallback_<step>` on the parameters global
-     * names the step's generic list.
+     * names the step's generic list. `source` follows the channel choice.
      */
     // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
     // reports them uncovered. A removed step is observable: `LookupBlueprintsTest` compares the steps with
     // the fields of the reference option blueprint and of the parameters blueprint.
     // @pest-mutate-ignore:RemoveArrayItem
     public const array STEPS = [
+        'source',
         'source_platform',
         'medium',
         'creative_format',
