@@ -146,7 +146,35 @@ it('renders the data of a redirect domain entry, without the row id and type', f
         ->and($data['source'])->toBe('/flu')
         ->and($data['target_url'])->toBe('https://www.uams.edu/flu')
         ->and($data['valid_until'])->toBe('2026-01-31')
-        ->and($data['submitted_by'])->toBe('user-1');
+        ->and($data['submitted_by'])->toBe('user-1')
+        ->and($data['generated_back_half'])->toBeFalse();
+});
+
+it('swaps in a generated back-half, keeping its case and every other field', function (): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '',
+        'destination' => 'https://www.uams.edu/flu',
+        'response' => '302',
+        'host' => 'uams.info',
+        'valid_from' => '2026-01-01',
+        'valid_until' => '2026-01-31',
+        'requester' => 'Communications',
+        'notes' => 'Flu season',
+    ], 'user-1');
+
+    $generated = $redirect->withGeneratedBackHalf('aB3xY9q');
+
+    expect($redirect->generatedBackHalf)->toBeFalse()
+        ->and($generated->generatedBackHalf)->toBeTrue()
+        ->and($generated->source)->toBe('/aB3xY9q')
+        ->and($generated->destination)->toBe('https://www.uams.edu/flu')
+        ->and($generated->response)->toBe('302')
+        ->and($generated->window)->toBe($redirect->window)
+        ->and($generated->requester)->toBe('Communications')
+        ->and($generated->notes)->toBe('Flu season')
+        ->and($generated->submittedBy)->toBe('user-1')
+        ->and($generated->host)->toBe('uams.info')
+        ->and($generated->toDomainData('uams.info')['generated_back_half'])->toBeTrue();
 });
 
 it('leaves the host null when none is given or it is not a domain', function (?string $host): void {

@@ -13,12 +13,15 @@ use Inertia\Response as InertiaResponse;
 use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\User;
 use Statamic\Http\Controllers\CP\CpController;
+use UAMSWeb\Aether\Redirects\Exceptions\CodeGenerationException;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
+use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
+use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 
@@ -39,6 +42,11 @@ use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
  * serves on that vanity domain; one without is a row of the `redirects` global
  * that serves on the main site's 404 path (UAMS-Web/aether-redirects#83). Both
  * go through the same approval workflow, and the review queue lists both.
+ *
+ * A request for a vanity domain with no source gets a generated back-half
+ * (UAMS-Web/aether-redirects#15): 7 base-62 characters never issued on that
+ * domain in any case. Approval checks it again, so two pending requests whose
+ * back-halves differ only in case cannot both go live.
  */
 class MarketingRedirectController extends CpController
 {
@@ -66,6 +74,7 @@ class MarketingRedirectController extends CpController
             'storeUrl' => cp_route('marketing-redirects.store'),
             'hostOptions' => $this->hostOptions(),
             'canApprove' => $this->canApprove(),
+            'generatedHosts' => RedirectHosts::VANITY,
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
                 ['value' => '302', 'label' => __('302 Found')],
@@ -88,9 +97,13 @@ class MarketingRedirectController extends CpController
         // Validate the raw submission before building the typed model.
         $validated = $this->validateInput($request);
 
+        // A vanity-domain request with no source asks for a generated back-half (UAMS-Web/aether-redirects#15);
+        // validation has already refused a blank source anywhere else.
+        $generate = $validated['source'] === null || trim($validated['source']) === '';
+
         // Build the canonical redirect, tagging the authenticated creator so the
         // approval slice can forbid self-approval (UAMS-Web/uams-statamic-archive#1357).
-        $redirect = MarketingRedirect::fromInput($validated, $this->currentUserId());
+        $redirect = MarketingRedirect::fromInput([...$validated, 'source' => $validated['source'] ?? ''], $this->currentUserId());
 
         // An inverted window (start after end) could never serve — reject it.
         if ($this->windowIsInverted($redirect)) {
@@ -110,6 +123,22 @@ class MarketingRedirectController extends CpController
 
         // The domain's entries hold a domain request; the global holds a main-site one.
         $store = $redirect->host === null ? $globalStore : $domainStore;
+
+        // Draw the back-half against every row on the domain that has issued one; a
+        // domain request always has a host here, since only a vanity domain may omit the source.
+        if ($generate && $redirect->host !== null) {
+            // The provider binds the back-half generator; anything else bound there falls back to it.
+            $generator = app(BackHalf::GENERATOR);
+
+            try {
+                $redirect = $redirect->withGeneratedBackHalf(BackHalf::generate(
+                    $this->rowsOnHost($domainStore->all(), $redirect->host),
+                    $generator instanceof RandomCode ? $generator : null,
+                ));
+            } catch (CodeGenerationException $exception) {
+                return $this->unprocessable('source', $exception->getMessage());
+            }
+        }
 
         // Surface a same-source collision within an overlapping window (UAMS-Web/uams-statamic-archive#1356),
         // but only against redirects that serve or may yet serve. A rejected
@@ -133,9 +162,7 @@ class MarketingRedirectController extends CpController
         // Report success with the stored row for the screen to confirm.
         return response()->json([
             'saved' => true,
-            'message' => $redirect->host === null
-                ? __('Redirect submitted for review. It serves on a 404 for every site once an approver approves it.')
-                : __('Redirect submitted for review. It serves on :host once an approver approves it.', ['host' => $redirect->host]),
+            'message' => $this->submittedMessage($redirect),
             'redirect' => $row,
         ], 201);
     }
@@ -168,6 +195,13 @@ class MarketingRedirectController extends CpController
 
         if ($error instanceof JsonResponse) {
             return $error;
+        }
+
+        // A generated back-half goes live only if no other live rule on its domain has issued it meanwhile.
+        $reissue = $this->reissueError($redirect, $store);
+
+        if ($reissue instanceof JsonResponse) {
+            return $reissue;
         }
 
         // Promote the request; it now passes the serve gate. The '' fallback is
@@ -226,14 +260,20 @@ class MarketingRedirectController extends CpController
     /**
      * Validate the create request.
      *
+     * A source may be left out only on a vanity domain, where it asks for a
+     * generated back-half (UAMS-Web/aether-redirects#15).
+     *
      * @param  Request  $request  The incoming create request
-     * @return array{source: string, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null}
+     * @return array{source: string|null, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null}
      */
     private function validateInput(Request $request): array
     {
-        /** @var array{source: string, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null} $validated */
+        $host = $request->input('host');
+        $vanity = RedirectHosts::isVanity(RedirectHosts::normalize(\is_string($host) ? $host : null));
+
+        /** @var array{source?: string|null, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null} $validated */
         $validated = $request->validate([
-            'source' => ['required', 'string', 'max:2048'],
+            'source' => [Rule::requiredIf(! $vanity), 'nullable', 'string', 'max:2048'],
             'destination' => ['required', 'string', 'max:2048'],
             'response' => ['required', 'string', Rule::in(MarketingRedirect::ALLOWED_RESPONSES)],
             'valid_from' => ['nullable', 'date'],
@@ -245,7 +285,7 @@ class MarketingRedirectController extends CpController
 
         // Normalize optional keys to a stable shape for MarketingRedirect::fromInput().
         return [
-            'source' => $validated['source'],
+            'source' => $validated['source'] ?? null,
             'destination' => $validated['destination'],
             'response' => $validated['response'],
             'valid_from' => $validated['valid_from'] ?? null,
@@ -269,6 +309,87 @@ class MarketingRedirectController extends CpController
 
         // Only a fully-bounded window can be inverted.
         return $from instanceof CarbonImmutable && $until instanceof CarbonImmutable && $from->gt($until);
+    }
+
+    /**
+     * The message confirming a submitted request, naming a generated back-half.
+     *
+     * @param  MarketingRedirect  $redirect  The stored request
+     * @return string What the requester is told
+     */
+    private function submittedMessage(MarketingRedirect $redirect): string
+    {
+        if ($redirect->host === null) {
+            return __('Redirect submitted for review. It serves on a 404 for every site once an approver approves it.');
+        }
+
+        if ($redirect->generatedBackHalf) {
+            return __('Redirect submitted for review. It serves on :url once an approver approves it.', ['url' => $redirect->host.$redirect->source]);
+        }
+
+        return __('Redirect submitted for review. It serves on :host once an approver approves it.', ['host' => $redirect->host]);
+    }
+
+    /**
+     * The error for approving a generated back-half that another live rule on its domain has issued.
+     *
+     * Creation drew the back-half against every row on its domain, but another
+     * request may have taken the same back-half in another case since, and gone
+     * live first (UAMS-Web/aether-redirects#15). Only approved rows block here: a
+     * pending one has not gone live, and counting it would let two pending
+     * requests each block the other. Rows whose window has ended still block, as
+     * at creation, because their links stay in circulation.
+     *
+     * @param  string  $id  The request being approved
+     * @param  RedirectRequestStore  $store  The store holding it
+     * @return JsonResponse|null A 422, or null when the request may go live
+     */
+    private function reissueError(string $id, RedirectRequestStore $store): ?JsonResponse
+    {
+        $row = $store->find($id);
+
+        // Only a generated back-half on a domain carries this guarantee; a typed path keeps its own rules.
+        if ($row === null || ! BackHalf::wasGenerated($row)) {
+            return null;
+        }
+
+        $host = RedirectHosts::normalize($row['host'] ?? null);
+        $source = $row['source'] ?? null;
+
+        // A generated row always has both; one without either has nothing to compare.
+        if ($host === null || ! \is_string($source)) {
+            return null;
+        }
+
+        $live = array_filter(
+            $this->rowsOnHost($store->all(), $host),
+            static fn (array $other): bool => ($other['id'] ?? null) !== $id
+                && RedirectStatus::fromRow($other) === RedirectStatus::Approved,
+        );
+
+        if (! BackHalf::isIssued($source, $live)) {
+            return null;
+        }
+
+        return $this->unprocessable('source', __(
+            'The back-half :source is already live on :host in another case. Reject this request so it can be submitted again for a new back-half.',
+            ['source' => $source, 'host' => $host]
+        ));
+    }
+
+    /**
+     * The rows that serve on one domain.
+     *
+     * @param  list<array<string, mixed>>  $rows  The stored rows
+     * @param  string  $host  The normalized domain
+     * @return list<array<string, mixed>> The rows whose host is that domain
+     */
+    private function rowsOnHost(array $rows, string $host): array
+    {
+        return array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => RedirectHosts::normalize($row['host'] ?? null) === $host,
+        ));
     }
 
     /**

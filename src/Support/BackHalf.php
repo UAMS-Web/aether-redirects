@@ -44,6 +44,17 @@ final class BackHalf
     public const int MAX_ATTEMPTS = 10;
 
     /**
+     * The entry field that marks a request's source as a generated back-half.
+     */
+    public const string FIELD = 'generated_back_half';
+
+    /**
+     * The container binding that resolves the generator a request draws with,
+     * so a host application or a test can replace it.
+     */
+    public const string GENERATOR = 'aether-redirects.back-half-generator';
+
+    /**
      * Return the generator configured for back-halves.
      *
      * @return RandomCode The base-62, 7-character generator
@@ -70,6 +81,20 @@ final class BackHalf
         return ($generator ?? self::generator())->generate(
             static fn (string $candidate): bool => self::isIssued($candidate, $rows),
         );
+    }
+
+    /**
+     * Whether a stored row's source is a generated back-half.
+     *
+     * Only a row the request utility marked counts; a typed path, a legacy row or
+     * a hand-edited entry carries no flag and is not one.
+     *
+     * @param  array<string, mixed>  $row  The stored row
+     * @return bool True when the row's source was generated
+     */
+    public static function wasGenerated(array $row): bool
+    {
+        return ($row[self::FIELD] ?? false) === true;
     }
 
     /**

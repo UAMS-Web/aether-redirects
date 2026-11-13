@@ -66,3 +66,11 @@ tabs:
               display: 'Rejection reason'
               if:
                 status: 'equals rejected'
+          -
+            handle: generated_back_half
+            field:
+              type: toggle
+              display: 'Generated back-half'
+              instructions: 'On when the utility generated this source on a vanity domain. Approval refuses a generated back-half that a live rule on the domain has issued in any case.'
+              visibility: read_only
+              width: 33

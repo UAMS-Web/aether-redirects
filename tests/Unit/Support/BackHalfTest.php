@@ -53,6 +53,7 @@ it('treats a back-half as issued by a row with the same source in any case', fun
 ]);
 
 it('counts pending, approved and legacy rows as issuing their source', function (array $row): void {
+    /** @var array<string, mixed> $row */
     expect(BackHalf::isIssued('aB3xY9q', [$row]))->toBeTrue();
 })->with([
     'pending request' => [['source' => '/aB3xY9q', 'status' => 'pending']],
@@ -129,3 +130,13 @@ it('reports failure when every possible back-half is issued', function (): void 
     expect(fn (): string => BackHalf::generate($rows, new RandomCode('AB', 1, 5)))
         ->toThrow(CodeGenerationException::class, 'after 5 attempts');
 });
+
+it('reads the generated flag only when it is exactly true', function (array $row, bool $generated): void {
+    /** @var array<string, mixed> $row */
+    expect(BackHalf::wasGenerated($row))->toBe($generated);
+})->with([
+    'flagged' => [[BackHalf::FIELD => true, 'source' => '/aB3xY9q'], true],
+    'flagged false' => [[BackHalf::FIELD => false, 'source' => '/typed'], false],
+    'no flag' => [['source' => '/typed'], false],
+    'a truthy string' => [[BackHalf::FIELD => '1'], false],
+]);
