@@ -37,12 +37,15 @@ final class RedirectHosts
     /**
      * The domains where a path is not reused for 12 weeks after its last use.
      *
-     * @var list<string>
+     * A method rather than a constant: PCOV attributes no coverage to a constant's
+     * initializer, so a mutation run could not select a test for it.
+     *
+     * @return list<string>
      */
-    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
-    // reports them uncovered. A changed list is observable, and `RedirectHostsTest` pins each domain.
-    // @pest-mutate-ignore:RemoveArrayItem
-    public const array VANITY = [self::INFO, self::HEALTH, self::BAPTIST];
+    public static function vanity(): array
+    {
+        return [self::INFO, self::HEALTH, self::BAPTIST];
+    }
 
     /**
      * Weeks a path stays reserved after the end of its last rule on a vanity domain.
@@ -60,7 +63,7 @@ final class RedirectHosts
     {
         // Both sides are strings, which compare the same loosely or strictly
         // @pest-mutate-ignore: TrueToFalse
-        return $host !== null && \in_array($host, self::VANITY, true);
+        return $host !== null && \in_array($host, self::vanity(), true);
     }
 
     /**
