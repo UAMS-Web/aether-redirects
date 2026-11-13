@@ -80,3 +80,20 @@ it('reports failure when every possible code is taken', function (): void {
     expect(fn (): string => ShortCode::generate([['source' => '/a'], ['source' => '/b']], new RandomCode('ab', 1, 3)))
         ->toThrow(CodeGenerationException::class, 'after 3 attempts');
 });
+
+it('recognizes the short-code format', function (string $value, bool $expected): void {
+    expect(ShortCode::isCode($value))->toBe($expected);
+})->with([
+    'a code' => ['abc234', true],
+    'every letter kind' => ['zyx987', true],
+    'five characters' => ['abc23', false],
+    'seven characters' => ['abc2345', false],
+    'a zero' => ['abc230', false],
+    'an o' => ['abco34', false],
+    'a one' => ['abc214', false],
+    'an l' => ['abcl34', false],
+    'an i' => ['abci34', false],
+    'uppercase' => ['ABC234', false],
+    'a leading slash' => ['/abc23', false],
+    'empty' => ['', false],
+]);
