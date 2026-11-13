@@ -42,7 +42,7 @@ final readonly class TaggedUrlComposer
     /**
      * The list a cascade step offers, given the request's earlier choices.
      *
-     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::STEPS}
+     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::steps()}
      * @param  TaggedUrlRequest  $request  The request so far; choices at this step and later are ignored
      * @return string|null The list id, or null when no choice and no generic list names one
      */
@@ -54,7 +54,7 @@ final readonly class TaggedUrlComposer
     /**
      * The options a cascade step offers, given the request's earlier choices.
      *
-     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::STEPS}
+     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::steps()}
      * @param  TaggedUrlRequest  $request  The request so far
      * @return list<LookupOption> The step's active options, or none when it has no list
      */
@@ -126,7 +126,7 @@ final readonly class TaggedUrlComposer
     {
         $ids = $request->channel === null ? [] : [$request->channel];
 
-        foreach (TaggedUrlLookup::STEPS as $earlier) {
+        foreach (TaggedUrlLookup::steps() as $earlier) {
             if ($earlier === $step) {
                 break;
             }
