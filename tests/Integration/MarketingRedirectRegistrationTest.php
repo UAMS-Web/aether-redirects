@@ -24,6 +24,7 @@ use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
@@ -152,6 +153,13 @@ function marketingRedirectRegistrationNavItems(): array
 
     return $items;
 }
+
+it('registers the permission to manage redirect domains with a label', function (): void {
+    $permission = Permission::get(RedirectDomainList::PERMISSION);
+
+    Assert::assertNotNull($permission);
+    expect($permission->label())->toBe('Manage redirect domains');
+});
 
 it('registers the request and approval permissions', function (): void {
     expect(Permission::get(MarketingRedirectController::PERMISSION))->not->toBeNull()

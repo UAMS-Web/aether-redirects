@@ -11,6 +11,7 @@ use Statamic\Auth\File\User as FileStatamicUser;
 use Statamic\Contracts\Auth\RoleRepository as RoleRepositoryContract;
 use Statamic\Entries\Collection as StatamicCollection;
 use Statamic\Entries\Entry as StatamicEntry;
+use Statamic\Events\EntrySaving;
 use Statamic\Facades\Blueprint as BlueprintFacade;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Entry;
@@ -19,6 +20,7 @@ use Statamic\Facades\Role;
 use Statamic\Facades\Stache;
 use Statamic\Facades\User;
 use Statamic\Stache\Stores\CollectionsStore;
+use UAMSWeb\Aether\Redirects\Listeners\GuardRedirectHosts;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
@@ -234,4 +236,10 @@ it('trusts a new domain as soon as its record is published, with no deploy', fun
     guardRecord('agec.org')->save();
 
     expect(RedirectDomainRules::publishedHosts())->toBe(['agec.org']);
+});
+
+it('ignores a saving event that does not carry an entry', function (): void {
+    $event = new EntrySaving(new stdClass);
+
+    expect(fn () => (new GuardRedirectHosts)->handle($event))->not->toThrow(Throwable::class);
 });
