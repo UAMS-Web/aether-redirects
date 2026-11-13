@@ -246,7 +246,7 @@ it('counts a pending tagged-only request in the review queue label', function ()
     Assert::assertInstanceOf(StatamicCollection::class, $collection);
     $collection->save();
 
-    app(TaggedUrlRequestStore::class)->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, 'creator');
+    app(TaggedUrlRequestStore::class)->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, 'creator', false, null);
     app(MarketingRedirectStore::class)->create(MarketingRedirect::fromInput(['source' => '/pending', 'destination' => '/target']));
 
     marketingRedirectRegistrationSignIn([MarketingRedirectController::APPROVE_PERMISSION]);

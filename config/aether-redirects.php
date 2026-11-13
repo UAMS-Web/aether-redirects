@@ -25,6 +25,26 @@ declare(strict_types=1);
 
 return [
 
-    // 'some_key' => 'default',
+    /*
+    | The Creative Services question on a redirect request (UAMS-Web/aether-redirects#25).
+    |
+    | Every request answers whether it involves Creative Services, and a "yes" needs a
+    | job number. The format below is one setting for every request form.
+    */
+    'creative_services' => [
+
+        'job_number' => [
+
+            // A regular expression, with delimiters, that a job number must match, such as '/^\d{5}$/'.
+            // Null (the default) accepts any job number, and the approver confirms it.
+            'pattern' => null,
+
+            // The format in words, shown beside the field and in the message for a number that does
+            // not match, such as 'five digits'. Null (the default) uses a generic description.
+            'description' => null,
+
+        ],
+
+    ],
 
 ];

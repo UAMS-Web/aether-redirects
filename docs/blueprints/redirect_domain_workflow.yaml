@@ -44,6 +44,21 @@ tabs:
               display: Requester
               width: 33
           -
+            handle: creative_services
+            field:
+              type: toggle
+              display: 'Involves Creative Services'
+              visibility: read_only
+              width: 33
+          -
+            handle: job_number
+            field:
+              type: text
+              display: 'Creative Services job number'
+              instructions: 'Set when the request involves Creative Services. The approver confirms it before approving.'
+              visibility: read_only
+              width: 33
+          -
             handle: submitted_by
             field:
               type: text

@@ -29,6 +29,10 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * "Tagged URL only" asks for a tagged URL with no vanity URL
  * (UAMS-Web/aether-redirects#18): the vanity fields are hidden and not sent, and
  * the tagged URL is issued once an approver approves the request.
+ *
+ * Every request answers whether it involves Creative Services, and a "yes" asks for
+ * the job number (UAMS-Web/aether-redirects#25). The answer is made on purpose, with
+ * no default, and the server refuses a vanity domain request that answers no.
  */
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
@@ -49,6 +53,8 @@ const props = defineProps({
     generatedHosts: { type: Array, default: () => [] },
     // Whether the site keeps tagged-only requests, and so offers them
     taggedAvailable: { type: Boolean, default: false },
+    // The job number format in words, from the add-on's `creative_services` setting
+    jobNumberDescription: { type: String, default: '' },
 });
 
 const instance = getCurrentInstance().proxy;
@@ -73,12 +79,14 @@ const blankForm = () => ({
     utm_id: '',
     utm_marketing_tactic: '',
     suppress_utm: false,
+    creative_services: '',
+    job_number: '',
 });
 
 // The fields each kind of request sends; the server refuses the vanity fields on a tagged-only request.
 const fieldsByKind = {
-    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'requester', 'notes'],
-    tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'requester', 'notes'],
+    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'creative_services', 'job_number', 'requester', 'notes'],
+    tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'creative_services', 'job_number', 'requester', 'notes'],
 };
 
 // Whether the form asks for a tagged URL alone.
@@ -329,6 +337,29 @@ async function submit() {
                         <p class="mt-1 text-xs text-gray-500">{{ __('Optional. Inclusive. Leave blank for no end date.') }}</p>
                         <p v-if="errorFor('valid_until')" class="mt-1 text-xs text-red-600" v-text="errorFor('valid_until')" />
                     </div>
+                </div>
+
+                <fieldset>
+                    <legend class="mb-1 block text-sm font-medium">{{ __('Does this request involve Creative Services?') }}</legend>
+                    <label class="mr-4 inline-flex items-center gap-2 text-sm">
+                        <input v-model="form.creative_services" type="radio" name="creative_services" value="yes" />
+                        {{ __('Yes') }}
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input v-model="form.creative_services" type="radio" name="creative_services" value="no" />
+                        {{ __('No') }}
+                    </label>
+                    <p v-if="errorFor('creative_services')" class="mt-1 text-xs text-red-600" v-text="errorFor('creative_services')" />
+                </fieldset>
+
+                <div v-if="form.creative_services === 'yes'">
+                    <label class="mb-1 block text-sm font-medium" for="mr-job-number">{{ __('Creative Services job number') }}</label>
+                    <input id="mr-job-number" v-model="form.job_number" type="text" :class="inputClass" autocomplete="off" />
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('Required. The approver confirms the number before approving.') }}
+                        <span v-if="jobNumberDescription">{{ __('Format:') }} {{ jobNumberDescription }}.</span>
+                    </p>
+                    <p v-if="errorFor('job_number')" class="mt-1 text-xs text-red-600" v-text="errorFor('job_number')" />
                 </div>
 
                 <div>

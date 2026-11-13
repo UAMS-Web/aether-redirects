@@ -121,3 +121,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Rejected.** A `kind: tagged` row with no source in the `redirects` global: no host setup, but it relies on every serving and collision path to exclude it. The destination alone as the issued URL until `#26`: it issues no tag. A tagged URL typed by hand: it is the hand assembly `#301` decision 2 retires.
 
 **Companion.** `UAMS-Web/aether-redirects#18`, `UAMS-Web/aether-redirects#26`, `UAMS-Web/aether-redirects#11`, `UAMS-Web/uams-statamic#301`.
+
+## 2026-11-13: Every request answers whether it involves Creative Services, and a yes carries a job number (#25)
+
+**Decision.** Every redirect request answers a yes/no "involves Creative Services" question. A vanity URL request must answer yes and give a job number; an answer of no is refused with a pointer to a `go.uams.edu` short code. A short link or a main-site request may answer either way, and a yes needs a job number. The job number format is one setting, `creative_services.job_number.pattern` with its words in `creative_services.job_number.description`, and by default it checks only that a number is given. The approver sees the answer and the number before approving.
+
+**Why.** The number is what ties a vanity URL to its Creative Services job. Checking only that a number is given keeps the add-on usable before the format is settled, and the approver confirms every number either way. One check class serves every request form, so the tagged-only request (#18) reuses the question, the field and the setting instead of validating a second time.
+
+**Rejected.** A separate format setting per request form: the tagged-only form would drift from the vanity one. Requiring a job number on every request: a request that does not involve Creative Services has none. Defaulting the answer to no: a default makes the answer unintentional, so the form has none and the server requires it.
+
+**Companion.** `UAMS-Web/aether-redirects#25`.

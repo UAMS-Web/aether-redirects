@@ -53,7 +53,7 @@ it('has nothing and offers nothing when the host has no collection', function ()
 });
 
 it('refuses to create a request when the host has no collection', function (): void {
-    turStore()->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, null);
+    turStore()->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, null, false, null);
 })->throws(RuntimeException::class, 'The "tagged_url_requests" collection does not exist.');
 
 it('finds nothing for an unknown id or an entry of another collection', function (): void {
@@ -89,6 +89,8 @@ it('stores only the request fields it knows, and lists pending requests only', f
         'Comms',
         'Notes',
         'creator',
+        false,
+        null,
     );
 
     expect($row)->toHaveKey('id')
@@ -101,7 +103,7 @@ it('stores only the request fields it knows, and lists pending requests only', f
     $id = $row['id'];
     Assert::assertIsString($id);
 
-    $second = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/other'), null, null, 'creator');
+    $second = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/other'), null, null, 'creator', false, null);
     $secondId = $second['id'];
     Assert::assertIsString($secondId);
     turStore()->reject($secondId, 'approver', 'No');
@@ -128,7 +130,7 @@ it('reads the choices of a stored row, ignoring values that are not text and a s
 it('names every field the store writes in the reference blueprint the host copies', function (): void {
     turStoreCollection();
 
-    $row = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, null);
+    $row = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, null, false, null);
 
     /** @var array{tabs: array<string, array{sections: list<array{fields: list<array{handle: string}>}>}>} $blueprint */
     $blueprint = Yaml::parseFile(__DIR__.'/../../../docs/blueprints/tagged_url_request.yaml');
@@ -153,8 +155,8 @@ it('names every field the store writes in the reference blueprint the host copie
 it('lists the pending requests as a list, ordered by destination', function (): void {
     turStoreCollection();
 
-    $first = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/a'), null, null, null);
-    $second = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/b'), null, null, null);
+    $first = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/a'), null, null, null, false, null);
+    $second = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/b'), null, null, null, false, null);
     $firstId = $first['id'];
     Assert::assertIsString($firstId);
     turStore()->reject($firstId, 'approver', 'No');
@@ -167,7 +169,7 @@ it('lists the pending requests as a list, ordered by destination', function (): 
 it('writes a review to the entry file, and clears an earlier rejection reason on approval', function (): void {
     turStoreCollection();
 
-    $row = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'flu']), null, null, null);
+    $row = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'flu']), null, null, null, false, null);
     $id = $row['id'];
     Assert::assertIsString($id);
 

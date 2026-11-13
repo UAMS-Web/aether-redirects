@@ -88,6 +88,7 @@ function turSubmit(FileStatamicUser $user, array $overrides = []): TestResponse
         'kind' => MarketingRedirectController::KIND_TAGGED,
         'destination' => 'https://www.uams.edu/flu',
         'utm_campaign' => 'flu-2026',
+        'creative_services' => 'no',
         ...$overrides,
     ]);
 }
@@ -285,7 +286,7 @@ it('tells the create screen whether tagged-only requests are offered', function 
 
 it('lists a pending tagged-only request in the same review queue as a vanity request', function (): void {
     $creator = mrdCreator();
-    $id = turId(turSubmit($creator, ['utm_id' => '42', TaggedUrlRequestStore::SUPPRESS_FIELD => true, 'requester' => 'Comms', 'notes' => 'Fall push']));
+    $id = turId(turSubmit($creator, ['utm_id' => '42', TaggedUrlRequestStore::SUPPRESS_FIELD => true, 'creative_services' => 'yes', 'job_number' => 'CS-1234', 'requester' => 'Comms', 'notes' => 'Fall push']));
     mrdSubmit($creator)->assertCreated();
 
     $approver = mrdApprover();
@@ -302,6 +303,8 @@ it('lists a pending tagged-only request in the same review queue as a vanity req
                 'destination' => 'https://www.uams.edu/flu',
                 'fields' => ['utm_campaign' => 'flu-2026', 'utm_id' => '42'],
                 'suppress_utm' => true,
+                'creative_services' => true,
+                'job_number' => 'CS-1234',
                 'requester' => 'Comms',
                 'notes' => 'Fall push',
                 'can_review' => true,
@@ -444,4 +447,87 @@ it('neither offers nor accepts a tagged-only request from a user who can only ma
     turSubmit($shortLinks)->assertForbidden();
 
     expect(app(TaggedUrlRequestStore::class)->all())->toBe([]);
+});
+
+it('asks a tagged-only request whether it involves Creative Services, and takes no for an answer', function (): void {
+    turSubmit(mrdCreator(), ['creative_services' => null])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['creative_services']);
+
+    turSubmit(mrdCreator(), ['creative_services' => 'maybe'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['creative_services']);
+
+    // No needs no job number, and a job number sent with no is not kept
+    $id = turId(turSubmit(mrdCreator(), ['creative_services' => 'no', 'job_number' => 'CS-1'])->assertCreated());
+
+    expect(turField($id, 'creative_services'))->toBeFalse()
+        ->and(turField($id, 'job_number'))->toBeNull();
+});
+
+it('needs a job number in the configured format when a tagged-only request involves Creative Services', function (): void {
+    config()->set('aether-redirects.creative_services.job_number.pattern', '/^CS-\d+$/');
+    config()->set('aether-redirects.creative_services.job_number.description', 'CS- and digits');
+
+    turSubmit(mrdCreator(), ['creative_services' => 'yes'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.job_number.0', 'Enter the Creative Services job number.');
+
+    turSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => 'nope'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.job_number.0', 'The job number must match CS- and digits.');
+
+    turSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => ['CS-1']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['job_number']);
+
+    turSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => 'CS-'.str_repeat('1', 98)])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['job_number']);
+
+    $id = turId(turSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => 'CS-1234'])->assertCreated());
+
+    expect(turField($id, 'creative_services'))->toBeTrue()
+        ->and(turField($id, 'job_number'))->toBe('CS-1234');
+});
+
+it('keeps a job number padded to the longest allowed length on a tagged-only request, trimmed', function (): void {
+    test()->withoutMiddleware([TrimStrings::class, CpTrimStrings::class, ConvertEmptyStringsToNull::class]);
+
+    $number = str_repeat('1', 98);
+    $id = turId(turSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => ' '.$number.' '])->assertCreated());
+
+    expect(turField($id, 'job_number'))->toBe($number);
+});
+
+it('requires the Creative Services answer even when the key is left out', function (): void {
+    $test = mrdTest();
+    $test->actingAs(mrdCreator());
+
+    $test->postJson(mrdRoute('marketing-redirects.store'), ['kind' => MarketingRedirectController::KIND_TAGGED, 'destination' => 'https://www.uams.edu/flu'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['creative_services']);
+});
+
+it('takes an empty job number with a no, and refuses one that is not text', function (): void {
+    turSubmit(mrdCreator(), ['creative_services' => 'no', 'job_number' => null])->assertCreated();
+
+    turSubmit(mrdCreator(), ['creative_services' => 'no', 'job_number' => ['CS-1']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['job_number']);
+});
+
+it('shows a stored tagged-only request with no Creative Services answer as not involving them', function (): void {
+    $entry = Entry::make();
+    Assert::assertInstanceOf(StatamicEntry::class, $entry);
+    $entry->collection(TaggedUrlRequestStore::COLLECTION);
+    $entry->data(['title' => 'https://www.uams.edu/', 'destination' => 'https://www.uams.edu/', 'status' => 'pending', 'submitted_by' => 'someone-else']);
+    $entry->save();
+
+    test()->actingAs(mrdApprover());
+
+    test()->get(mrdRoute('marketing-redirects.review'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('redirects.0.creative_services', false)
+            ->where('redirects.0.job_number', null));
 });

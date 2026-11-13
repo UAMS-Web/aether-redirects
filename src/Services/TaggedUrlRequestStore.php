@@ -125,12 +125,20 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
      * @param  string|null  $requester  Free-text requester attribution
      * @param  string|null  $notes  Free-text notes
      * @param  string|null  $submittedBy  The Control Panel user id creating the request
+     * @param  bool  $creativeServices  Whether the request involves Creative Services (UAMS-Web/aether-redirects#25)
+     * @param  string|null  $jobNumber  The Creative Services job number, when it does
      * @return array<string, mixed> The stored row, including the entry id
      *
      * @throws RuntimeException When the collection does not exist.
      */
-    public function create(TaggedUrlRequest $request, ?string $requester, ?string $notes, ?string $submittedBy): array
-    {
+    public function create(
+        TaggedUrlRequest $request,
+        ?string $requester,
+        ?string $notes,
+        ?string $submittedBy,
+        bool $creativeServices,
+        ?string $jobNumber,
+    ): array {
         if (! self::available()) {
             throw new RuntimeException(sprintf('The "%s" collection does not exist.', self::COLLECTION));
         }
@@ -149,6 +157,8 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
             'destination' => $request->destination,
             ...$fields,
             self::SUPPRESS_FIELD => $request->suppressUtm,
+            'creative_services' => $creativeServices,
+            'job_number' => $jobNumber,
             'requester' => $requester,
             'notes' => $notes,
             'status' => RedirectStatus::Pending->value,

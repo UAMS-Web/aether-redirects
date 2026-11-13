@@ -40,6 +40,18 @@ tabs:
               type: toggle
               display: 'Leave the utm_ parameters off'
           -
+            handle: creative_services
+            field:
+              type: toggle
+              display: 'Involves Creative Services'
+              width: 33
+          -
+            handle: job_number
+            field:
+              type: text
+              display: 'Creative Services job number'
+              width: 66
+          -
             handle: requester
             field:
               type: text

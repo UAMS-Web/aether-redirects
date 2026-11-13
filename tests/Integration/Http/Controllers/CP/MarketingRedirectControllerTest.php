@@ -126,6 +126,8 @@ function marketingRedirectStorePending(FileStatamicUser $creator, array $overrid
     test()->actingAs($creator);
 
     $response = test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), array_merge([
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity-'.Str::uuid(),
         'destination' => '/target',
         'response' => '301',
@@ -209,6 +211,8 @@ it('creates a pending redirect that does NOT serve until an approver approves it
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => 'Flu-Shot/',
         'destination' => '/clinics/flu',
         'response' => '301',
@@ -254,6 +258,8 @@ it('retains a rejected redirect with its reason and never serves it', function (
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/gone',
         'destination' => '/nowhere',
         'response' => '301',
@@ -286,6 +292,8 @@ it('stores the redirect on the shared default site so it serves on every site', 
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '302',
@@ -305,6 +313,8 @@ it('captures the optional validity window and requester metadata', function (): 
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/campaign',
         'destination' => '/promo',
         'response' => '301',
@@ -328,6 +338,8 @@ it('rejects a source collision within an overlapping validity window', function 
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/Flu/',
         'destination' => '/new-place',
         'response' => '301',
@@ -354,6 +366,8 @@ it('lets a source be re-requested after its earlier request was rejected', funct
     // collision-detector-is-status-blind defect.
     test()->actingAs(marketingRedirectSuperUser());
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/promo',
         'destination' => '/campaign-b',
         'response' => '301',
@@ -370,6 +384,8 @@ it('still blocks re-requesting a source that already has an approved redirect', 
     // A second request for the same source collides — an approved redirect serves.
     test()->actingAs(marketingRedirectSuperUser());
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vip',
         'destination' => '/b',
         'response' => '301',
@@ -384,6 +400,8 @@ it('allows the same source with a non-overlapping validity window', function ():
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/flu',
         'destination' => '/february-place',
         'response' => '301',
@@ -398,6 +416,8 @@ it('rejects an inverted validity window', function (): void {
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -412,6 +432,8 @@ it('validates the required and constrained fields', function (): void {
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '',
         'destination' => '',
         'response' => '418',
@@ -433,6 +455,8 @@ it('forbids storing a redirect for users without the permission', function (): v
     test()->actingAs(marketingRedirectPlainUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -638,6 +662,8 @@ it('forbids the create screen and the store endpoint to a CP user holding only t
     test()->getJson(marketingRedirectCpRoute('marketing-redirects.create'))->assertForbidden();
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -667,6 +693,8 @@ it('reports a saved request with its review message', function (): void {
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -762,6 +790,8 @@ it('accepts every optional field sent as null', function (): void {
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -776,6 +806,8 @@ it('accepts a window bounded on one side only', function (array $window): void {
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), array_merge([
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -791,6 +823,8 @@ it('reports an inverted window with a message as well as the field error', funct
     $message = 'The "valid until" date must be on or after the "valid from" date.';
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/vanity',
         'destination' => '/target',
         'response' => '301',
@@ -811,6 +845,8 @@ it('names a conflicting redirect that has no destination by its source alone', f
     test()->actingAs(marketingRedirectSuperUser());
 
     test()->postJson(marketingRedirectCpRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'source' => '/flu',
         'destination' => '/target',
         'response' => '301',

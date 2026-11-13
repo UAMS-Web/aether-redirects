@@ -74,6 +74,8 @@ it('renders a replicator row matching the keys the serving tag reads', function 
         'valid_until' => '2026-03-31',
         'requester' => 'Comms',
         'notes' => 'spring push',
+        'creative_services' => false,
+        'job_number' => null,
         'submitted_by' => null,
         'reviewed_by' => null,
         'rejection_reason' => null,
@@ -225,3 +227,54 @@ it('leaves the host null when none is given or it is not a domain', function (?s
 
     expect($redirect->host)->toBeNull();
 })->with([[null], [''], ['not a host']]);
+
+it('keeps the job number only for a request that involves Creative Services', function (?string $answer, ?string $number, bool $involved, ?string $kept): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '/vanity',
+        'destination' => '/target',
+        'creative_services' => $answer,
+        'job_number' => $number,
+    ]);
+
+    expect($redirect->creativeServices)->toBe($involved)
+        ->and($redirect->jobNumber)->toBe($kept)
+        ->and($redirect->toRow('row-id')['creative_services'])->toBe($involved)
+        ->and($redirect->toRow('row-id')['job_number'])->toBe($kept)
+        ->and($redirect->toDomainData('host-id')['job_number'])->toBe($kept);
+})->with([
+    'yes with a number' => ['yes', ' 12345 ', true, '12345'],
+    'yes with a blank number' => ['yes', '   ', true, null],
+    'no discards a number' => ['no', '12345', false, null],
+    'no answer' => [null, '12345', false, null],
+]);
+
+it('carries the Creative Services answer onto a generated back-half', function (): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '',
+        'destination' => '/target',
+        'creative_services' => 'yes',
+        'job_number' => '12345',
+    ])->withGeneratedBackHalf('Ab3Xy9Q');
+
+    expect($redirect->creativeServices)->toBeTrue()
+        ->and($redirect->jobNumber)->toBe('12345');
+});
+
+it('defaults to a request that does not involve Creative Services', function (): void {
+    $redirect = new MarketingRedirect('/vanity', '/target');
+
+    expect($redirect->creativeServices)->toBeFalse()
+        ->and($redirect->jobNumber)->toBeNull();
+});
+
+it('carries the Creative Services answer onto a short code', function (): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '',
+        'destination' => '/target',
+        'creative_services' => 'yes',
+        'job_number' => '12345',
+    ])->withShortCode('abc234', true);
+
+    expect($redirect->creativeServices)->toBeTrue()
+        ->and($redirect->jobNumber)->toBe('12345');
+});
