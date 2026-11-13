@@ -57,6 +57,8 @@ final readonly class MarketingRedirect
      * @param  string|null  $submittedBy  The Control Panel user id that created the request (for the no-self-approve gate, UAMS-Web/uams-statamic-archive#1357)
      * @param  string|null  $host  The redirect domain the rule serves on, or null for the main site's `redirects` global (UAMS-Web/aether-redirects#83)
      * @param  bool  $generatedBackHalf  Whether the source is a generated back-half rather than a path the requester typed (UAMS-Web/aether-redirects#15)
+     * @param  bool  $creativeServices  Whether the request involves Creative Services (UAMS-Web/aether-redirects#25)
+     * @param  string|null  $jobNumber  The Creative Services job number, set only when the request involves Creative Services
      */
     public function __construct(
         public string $source,
@@ -68,6 +70,8 @@ final readonly class MarketingRedirect
         public ?string $submittedBy = null,
         public ?string $host = null,
         public bool $generatedBackHalf = false,
+        public bool $creativeServices = false,
+        public ?string $jobNumber = null,
     ) {}
 
     /**
@@ -78,12 +82,16 @@ final readonly class MarketingRedirect
      * is not request data — the controller supplies the authenticated user id so
      * the approval slice can forbid self-approval (UAMS-Web/uams-statamic-archive#1357).
      *
-     * @param  array{source: string, destination: string, response?: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null}  $input  Validated request data
+     * A job number is kept only for a request that involves Creative Services.
+     *
+     * @param  array{source: string, destination: string, response?: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null, creative_services?: string|null, job_number?: string|null}  $input  Validated request data
      * @param  string|null  $submittedBy  The Control Panel user id creating the request
      * @return self The typed marketing redirect
      */
     public static function fromInput(array $input, ?string $submittedBy = null): self
     {
+        $creativeServices = CreativeServices::involved($input['creative_services'] ?? null);
+
         return new self(
             source: RedirectSource::normalize($input['source']),
             destination: trim($input['destination']),
@@ -96,6 +104,8 @@ final readonly class MarketingRedirect
             notes: self::cleanOptional($input['notes'] ?? null),
             submittedBy: self::cleanOptional($submittedBy),
             host: RedirectHosts::normalize($input['host'] ?? null),
+            creativeServices: $creativeServices,
+            jobNumber: $creativeServices ? self::cleanOptional($input['job_number'] ?? null) : null,
         );
     }
 
@@ -121,6 +131,8 @@ final readonly class MarketingRedirect
             submittedBy: $this->submittedBy,
             host: $this->host,
             generatedBackHalf: true,
+            creativeServices: $this->creativeServices,
+            jobNumber: $this->jobNumber,
         );
     }
 
@@ -156,6 +168,8 @@ final readonly class MarketingRedirect
             'valid_until' => $this->window->until?->toDateString(),
             'requester' => $this->requester,
             'notes' => $this->notes,
+            'creative_services' => $this->creativeServices,
+            'job_number' => $this->jobNumber,
             'submitted_by' => $this->submittedBy,
             'reviewed_by' => null,
             'rejection_reason' => null,

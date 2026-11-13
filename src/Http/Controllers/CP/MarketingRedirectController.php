@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use LogicException;
@@ -20,6 +21,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
+use UAMSWeb\Aether\Redirects\Support\CreativeServices;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
@@ -75,6 +77,7 @@ class MarketingRedirectController extends CpController
             'hostOptions' => $this->hostOptions(),
             'canApprove' => $this->canApprove(),
             'generatedHosts' => RedirectHosts::vanity(),
+            'jobNumberDescription' => CreativeServices::description(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
                 ['value' => '302', 'label' => __('302 Found')],
@@ -270,14 +273,14 @@ class MarketingRedirectController extends CpController
      * generated back-half (UAMS-Web/aether-redirects#15).
      *
      * @param  Request  $request  The incoming create request
-     * @return array{source: string|null, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null}
+     * @return array{source: string|null, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null, creative_services: string, job_number: string|null}
      */
     private function validateInput(Request $request): array
     {
         $host = $request->input('host');
         $vanity = RedirectHosts::isVanity(RedirectHosts::normalize(\is_string($host) ? $host : null));
 
-        /** @var array{source?: string|null, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null} $validated */
+        /** @var array{source?: string|null, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null, creative_services: string, job_number?: string|null} $validated */
         $validated = $request->validate([
             'source' => [Rule::requiredIf(! $vanity), 'nullable', 'string', 'max:2048'],
             'destination' => ['required', 'string', 'max:2048'],
@@ -287,7 +290,11 @@ class MarketingRedirectController extends CpController
             'requester' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2048'],
             'host' => ['nullable', 'string'],
+            'creative_services' => ['required', Rule::in(CreativeServices::answers())],
+            'job_number' => ['nullable', 'string', 'max:'.CreativeServices::JOB_NUMBER_MAX_LENGTH],
         ]);
+
+        $this->assertCreativeServices($validated, $vanity);
 
         // Normalize optional keys to a stable shape for MarketingRedirect::fromInput().
         return [
@@ -299,7 +306,43 @@ class MarketingRedirectController extends CpController
             'requester' => $validated['requester'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'host' => $validated['host'] ?? null,
+            'creative_services' => $validated['creative_services'],
+            'job_number' => $validated['job_number'] ?? null,
         ];
+    }
+
+    /**
+     * Refuse a request whose Creative Services answer does not fit its form (UAMS-Web/aether-redirects#25).
+     *
+     * A vanity URL request must involve Creative Services; a request that does not
+     * is pointed to a go.uams.edu short code. Any request that answers yes needs a
+     * job number in the configured format.
+     *
+     * @param  array<string, mixed>  $validated  The validated request data
+     * @param  bool  $vanity  Whether the request is for a vanity domain
+     *
+     * @throws ValidationException When the answer or the job number is refused.
+     */
+    private function assertCreativeServices(array $validated, bool $vanity): void
+    {
+        $involved = CreativeServices::involved(\is_string($validated['creative_services'] ?? null) ? $validated['creative_services'] : null);
+
+        if ($vanity && ! $involved) {
+            throw ValidationException::withMessages([
+                'creative_services' => __('A vanity URL is made with Creative Services. For a link that does not involve them, request a go.uams.edu short code.'),
+            ]);
+        }
+
+        if (! $involved) {
+            return;
+        }
+
+        $jobNumber = \is_string($validated['job_number'] ?? null) ? $validated['job_number'] : null;
+        $error = CreativeServices::jobNumberError($jobNumber);
+
+        if ($error !== null) {
+            throw ValidationException::withMessages(['job_number' => $error]);
+        }
     }
 
     /**
@@ -483,6 +526,8 @@ class MarketingRedirectController extends CpController
                 'notes' => \is_string($row['notes'] ?? null) ? $row['notes'] : null,
                 'valid_from' => \is_string($row['valid_from'] ?? null) ? $row['valid_from'] : null,
                 'valid_until' => \is_string($row['valid_until'] ?? null) ? $row['valid_until'] : null,
+                'creative_services' => ($row['creative_services'] ?? false) === true,
+                'job_number' => \is_string($row['job_number'] ?? null) ? $row['job_number'] : null,
                 'can_review' => $submittedBy === null || $submittedBy !== $currentUserId,
                 'approve_url' => cp_route('marketing-redirects.approve', ['redirect' => $id]),
                 'reject_url' => cp_route('marketing-redirects.reject', ['redirect' => $id]),

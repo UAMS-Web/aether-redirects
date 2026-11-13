@@ -39,6 +39,8 @@ it('generates a back-half for a vanity domain request with no source, and serves
     // The submit helper fills in a source, so post the payload without one directly
     test()->actingAs(mrdCreator());
     $response = test()->postJson(mrdRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'host' => $host,
         'destination' => $destination,
         'response' => '301',

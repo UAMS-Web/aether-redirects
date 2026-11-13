@@ -149,6 +149,8 @@ function mrdSubmit(FileStatamicUser $user, array $overrides = []): TestResponse
     $test->actingAs($user);
 
     return $test->postJson(mrdRoute('marketing-redirects.store'), [
+        'creative_services' => 'yes',
+        'job_number' => '12345',
         'host' => 'uams.info',
         'source' => '/flu-'.Str::lower(Str::random(6)),
         'destination' => 'https://www.uams.edu/clinics/flu',
