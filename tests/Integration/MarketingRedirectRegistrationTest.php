@@ -155,10 +155,7 @@ function marketingRedirectRegistrationNavItems(): array
 }
 
 it('registers the permission to manage redirect domains with a label', function (): void {
-    $permission = Permission::get(RedirectDomainList::PERMISSION);
-
-    Assert::assertNotNull($permission);
-    expect($permission->label())->toBe('Manage redirect domains');
+    expect(Permission::get(RedirectDomainList::PERMISSION)->label())->toBe('Manage redirect domains');
 });
 
 it('registers the request and approval permissions', function (): void {
