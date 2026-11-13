@@ -24,6 +24,7 @@ use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
@@ -110,6 +111,8 @@ class ServiceProvider extends AddonServiceProvider
                 ->label(__('Create marketing redirects'));
             Permission::register(MarketingRedirectController::APPROVE_PERMISSION)
                 ->label(__('Approve marketing redirects'));
+            Permission::register(RedirectDomainList::PERMISSION)
+                ->label(__('Manage redirect domains'));
         });
     }
 

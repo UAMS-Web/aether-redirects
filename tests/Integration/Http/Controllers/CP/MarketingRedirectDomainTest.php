@@ -36,6 +36,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 /**
  * HTTP coverage for the approval workflow on the `redirect_domains` collection
@@ -114,7 +115,7 @@ function mrdSeed(array $data): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'enabled' => true,
         'whole_domain' => false,
         'use_regex' => false,
@@ -122,7 +123,7 @@ function mrdSeed(array $data): StatamicEntry
         'response' => '301',
         'order' => 30,
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
@@ -275,6 +276,11 @@ beforeEach(function (): void {
     Assert::assertInstanceOf(StatamicCollection::class, $collection);
 
     $collection->save();
+
+    // The domain list: the vanity domains and the short-link domain
+    foreach (['uams.info', 'uams.health', 'uamsbaptist.health', 'go.uams.edu'] as $host) {
+        RedirectDomainRecords::idFor($host);
+    }
 });
 
 it('saves a request as a pending entry that does not serve until an approver approves it', function (): void {
@@ -293,7 +299,7 @@ it('saves a request as a pending entry that does not serve until an approver app
     Assert::assertInstanceOf(StatamicEntry::class, $entry);
 
     expect($entry->collectionHandle())->toBe('redirect_domains')
-        ->and($entry->get('host'))->toBe('uams.info')
+        ->and($entry->get('host'))->toBe(RedirectDomainRecords::idFor('uams.info'))
         ->and($entry->get('source'))->toBe('/flu')
         ->and($entry->get('status'))->toBe('pending')
         ->and($entry->get('submitted_by'))->toBe($creator->id())
@@ -401,6 +407,14 @@ it('refuses a mismatched domain from a creator and allows it from an approver', 
     'relative destination on uams.info' => ['uams.info', '/clinics'],
 ]);
 
+it('lets a super user save a mismatched domain, since a super user holds every permission', function (): void {
+    $user = mrdCreator();
+    $user->makeSuper();
+    $user->save();
+
+    mrdSubmit($user, ['host' => 'uams.info', 'destination' => 'https://uamshealth.com/clinics'])->assertCreated();
+});
+
 it('refuses a domain that is not a redirect domain', function (string|array $host, string $message): void {
     $response = mrdSubmit(mrdCreator(), ['host' => $host]);
 
@@ -493,7 +507,7 @@ it('hands the create screen the domains a request can be made for', function ():
     test()->get(mrdRoute('marketing-redirects.create'))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('hostOptions', ['uams.info', 'uams.health', 'uamsbaptist.health', 'go.uams.edu', 'zz.example.org'])
+            ->where('hostOptions', ['go.uams.edu', 'uams.health', 'uams.info', 'uamsbaptist.health', 'zz.example.org'])
             ->where('canApprove', false));
 });
 
@@ -772,14 +786,26 @@ it('refuses to generate with a generator binding that is not a code generator', 
     expect(mrdEntryCount())->toBe(0);
 });
 
-it('approves a flagged entry that has lost its domain or its source, since there is nothing to compare', function (array $broken): void {
-    /** @var array<string, mixed> $broken */
+it('approves a flagged entry whose source is not a string, since there is nothing to compare', function (): void {
     mrdSeed(['host' => 'uams.info', 'source' => '/AB3XY9Q', 'target_url' => 'https://www.uams.edu/old', 'status' => 'approved']);
-    $request = mrdGeneratedRequest('/aB3xY9q', $broken);
+    $request = mrdGeneratedRequest('/aB3xY9q', ['source' => ['/aB3xY9q']]);
 
     test()->actingAs(mrdApprover());
     test()->postJson(mrdRoute('marketing-redirects.approve', ['redirect' => $request->id()]))->assertOk();
-})->with([
-    'no domain' => [['host' => null]],
-    'a source that is not a string' => [['source' => ['/aB3xY9q']]],
-]);
+});
+
+it('leaves a flagged entry that has lost its domain to the domain guard, rather than comparing it', function (): void {
+    mrdSeed(['host' => 'uams.info', 'source' => '/AB3XY9Q', 'target_url' => 'https://www.uams.edu/old', 'status' => 'approved']);
+    $request = mrdGeneratedRequest('/aB3xY9q');
+
+    // The domain guard refuses such an entry from the Control Panel, so it is written as a hand edit would be
+    $request->set('host', null);
+    $request->saveQuietly();
+
+    // The back-half re-check steps aside, so the refusal names the domain and not the back-half
+    test()->actingAs(mrdApprover());
+    test()->postJson(mrdRoute('marketing-redirects.approve', ['redirect' => $request->id()]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['host' => 'Choose a domain from the domain list.'])
+        ->assertJsonMissingValidationErrors(['source']);
+});

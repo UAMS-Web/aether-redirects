@@ -10,13 +10,15 @@ tabs:
           -
             handle: host
             field:
-              type: text
+              type: entries
               display: Domain
-              instructions: 'The domain this rule answers on, without `https://` or a path. For example: `agec.org`.'
-              placeholder: example.org
+              instructions: 'The domain this rule answers on, chosen from the domain list.'
+              collections:
+                - redirect_hosts
+              max_items: 1
+              create: false
               validate:
                 - required
-                - 'regex:/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/i'
               listable: true
               filterable: true
               width: 66

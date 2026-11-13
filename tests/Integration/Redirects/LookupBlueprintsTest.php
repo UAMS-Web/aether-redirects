@@ -156,7 +156,7 @@ it('lets a composed list name its member lists, in order, from the lists collect
 it("gives the options collection's entry blueprint its label, value, list, pointers, flag and order", function (): void {
     $blueprint = lookupEntryBlueprint('lookup_option.yaml');
 
-    expect(lookupFieldHandles($blueprint))->toBe(['title', 'value', 'list', ...TaggedUrlLookup::STEPS, 'active', 'order'])
+    expect(lookupFieldHandles($blueprint))->toBe(['title', 'value', 'list', ...TaggedUrlLookup::steps(), 'active', 'order'])
         ->and(lookupField($blueprint, 'title')->display())->toBe('Label')
         ->and(lookupField($blueprint, 'value')->get('required'))->toBeTrue()
         ->and(lookupField($blueprint, 'active')->defaultValue())->toBeTrue()
@@ -179,7 +179,7 @@ it('gives an option one optional downstream list pointer for each cascade step',
         ->and($pointer->get('collections'))->toBe([TaggedUrlLookup::LISTS_COLLECTION])
         ->and($pointer->get('max_items'))->toBe(1)
         ->and($pointer->isRequired())->toBeFalse();
-})->with(TaggedUrlLookup::STEPS);
+})->with(TaggedUrlLookup::steps());
 
 it("serves the parameters global set's blueprint from this package", function (): void {
     $blueprint = lookupParametersBlueprint();
@@ -232,7 +232,16 @@ it('lets the generic fallback list of each cascade step be chosen', function (st
     expect($fallback->type())->toBe('entries')
         ->and($fallback->get('collections'))->toBe([TaggedUrlLookup::LISTS_COLLECTION])
         ->and($fallback->get('max_items'))->toBe(1);
-})->with(TaggedUrlLookup::STEPS);
+})->with(TaggedUrlLookup::steps());
+
+it('lets the channel list, the first choice of the cascade, be chosen', function (): void {
+    $channel = lookupField(lookupParametersBlueprint(), TaggedUrlLookup::CHANNEL_LIST_FIELD);
+
+    expect($channel->type())->toBe('entries')
+        ->and($channel->get('collections'))->toBe([TaggedUrlLookup::LISTS_COLLECTION])
+        ->and($channel->get('max_items'))->toBe(1)
+        ->and(TaggedUrlLookup::steps()[0])->toBe('source');
+});
 
 it('offers a fallback field for exactly the steps an option can point at', function (): void {
     $fallbacks = collect(lookupFieldHandles(lookupParametersBlueprint()))
@@ -241,7 +250,7 @@ it('offers a fallback field for exactly the steps an option can point at', funct
         ->values()
         ->all();
 
-    expect($fallbacks)->toBe(TaggedUrlLookup::STEPS);
+    expect($fallbacks)->toBe(TaggedUrlLookup::steps());
 });
 
 it('defines no collection, global set or entry of its own', function (): void {

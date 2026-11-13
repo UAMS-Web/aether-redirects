@@ -91,6 +91,9 @@ final readonly class RedirectDomainRules
         /** @var Collection<int, mixed> $entries */
         $entries = $query->get();
 
+        // Resolve each entry's host against the domain list once
+        $records = RedirectDomainList::records();
+
         $rules = [];
         $unresolved = [];
         $invalid = [];
@@ -103,8 +106,8 @@ final readonly class RedirectDomainRules
                 continue;
             }
 
-            // Leave out an entry whose host could not name a manifest safely
-            $host = self::normalizeHost($entry->get('host'));
+            // Leave out an entry whose host names no trusted domain
+            $host = RedirectDomainList::resolve($entry->get('host'), $records);
 
             if ($host === null) {
                 $id = $entry->id();
@@ -136,49 +139,18 @@ final readonly class RedirectDomainRules
     }
 
     /**
-     * The hosts the collection's published entries name, without building rules.
+     * The hosts the application trusts: the hosts of the published domain records.
      *
      * One entry query, with no rule built and no entry target resolved, so a
      * caller that only needs to know which hosts are redirect domains does not
-     * pay for a full read. A host that is not a valid domain is left out.
+     * pay for a full read. A redirect rule cannot add a host to this list
+     * (UAMS-Web/aether-redirects#24).
      *
-     * @param  string  $collection  The collection handle.
-     * @return list<string> The normalized hosts, once each.
+     * @return list<string> The normalized hosts, sorted, once each.
      */
-    public static function publishedHosts(string $collection = self::COLLECTION): array
+    public static function publishedHosts(): array
     {
-        /** @var EntryQueryBuilder $query */
-        $query = Entry::query();
-        /** @var EntryQueryBuilder $query */
-        $query = $query->where('collection', $collection);
-        /** @var EntryQueryBuilder $query */
-        $query = $query->whereStatus('published');
-
-        // The store returns loosely typed items; the `instanceof` below narrows each one
-        /** @var Collection<int, mixed> $entries */
-        $entries = $query->get();
-
-        $hosts = [];
-
-        foreach ($entries as $entry) {
-            // An entry query yields entries only, so this guard narrows the type for
-            // static analysis and never skips anything
-            // @pest-mutate-ignore:InstanceOfToTrue,ContinueToBreak
-            if (! $entry instanceof StatamicEntry) {
-                continue;
-            }
-
-            // Keep a host that names a valid domain, once
-            $host = self::normalizeHost($entry->get('host'));
-
-            if ($host !== null) {
-                // Only the keys are read, so the stored value does not matter
-                // @pest-mutate-ignore:TrueToFalse
-                $hosts[$host] = true;
-            }
-        }
-
-        return array_keys($hosts);
+        return RedirectDomainList::hosts();
     }
 
     /**

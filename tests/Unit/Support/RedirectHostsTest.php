@@ -40,6 +40,10 @@ it('accepts the pairings a creator may make', function (string $host, string $de
     'a domain with no pairing rule' => ['go.uams.edu', 'https://example.org/', true],
 ]);
 
+it('lists the vanity domains, each once and in order', function (): void {
+    expect(RedirectHosts::vanity())->toBe(['uams.info', 'uams.health', 'uamsbaptist.health']);
+});
+
 it('names the vanity domains', function (): void {
     expect(RedirectHosts::isVanity('uams.info'))->toBeTrue()
         ->and(RedirectHosts::isVanity('uams.health'))->toBeTrue()

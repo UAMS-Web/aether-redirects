@@ -20,6 +20,7 @@ use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Services\EdgeRedirectManifestBuilder;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 use UAMSWeb\Aether\Redirects\Tests\Support\StacheIsolation;
 
 // Stache-isolated: each test saves redirect domain entries.
@@ -84,13 +85,13 @@ function commandEntry(string $host, array $data = []): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'host' => $host,
         'whole_domain' => true,
         'target_type' => 'url',
         'target_url' => 'https://uamshealth.com/a/b',
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
