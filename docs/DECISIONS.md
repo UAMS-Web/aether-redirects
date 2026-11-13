@@ -89,3 +89,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Open.** The host's `redirect_domain` blueprint does not show the workflow fields until the host copies them from `docs/blueprints/redirect_domain_workflow.yaml`, since an add-on cannot serve a collection blueprint (`UAMS-Web/aether-redirects#35`). Entries made by the utility store them regardless.
 
 **Companion.** `UAMS-Web/uams-statamic#191` (imports the domains' rules into the collection), `UAMS-Web/aether-redirects#84`.
+
+## 2026-11-13: Standard parameters take fixed sources, and the channel list starts the cascade (#26)
+
+**Decision.** Each Google Analytics standard parameter has a fixed source in code: `utm_source` takes the source step (the list the channel choice names), `utm_source_platform`, `utm_medium`, `utm_creative_format`, `utm_term` and `utm_content` take the step of the same name, and `utm_campaign`, `utm_marketing_tactic` and `utm_id` take the request field of the same name. The `standard_parameters` checkboxes on the `tagged_url_parameters` global only choose which of them a URL carries; standard parameters come first in the order Google lists them, then custom ones by their `order`. The channel step works like every other step: the global gains `channel_list`, naming the list of channels a request starts from, and `fallback_source`, and options gain a `source` pointer, so `source` is the first entry of `TaggedUrlLookup::STEPS`.
+
+**Why.** Decided by Josh on 2026-11-13, from worked examples; `utm_id` was left open there and takes a request field, the default that ruling allowed. The step names already match the standard names, so a fixed map needs no blueprint change for the standard parameters and cannot be misconfigured. Giving the channel a list field and the source step a pointer and a fallback lets one cascade rule (deepest choice, then the generic list) cover every step.
+
+**Rejected.** A "value comes from" mapping per standard parameter on the global: more fields for a mapping no site needs to change. Treating the channel as a request field whose options are one named list: the source step would then be the only step without a pointer and a fallback.
+
+**Companion.** `UAMS-Web/aether-redirects#26`, `UAMS-Web/aether-redirects#45`.
