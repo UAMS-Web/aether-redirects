@@ -11,10 +11,16 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * required-reason field and POSTs to its `reject_url`. A request the current
  * user submitted is not reviewable (`can_review` is false) — the server also
  * forbids it, so this only disables the buttons. A reviewed row leaves the list.
+ *
+ * A tagged-only request (`kind` `tagged`, UAMS-Web/aether-redirects#18) has no
+ * domain or source; it shows its destination and request fields, and approving
+ * it issues its tagged URL.
  */
 const props = defineProps({
-    // Pending requests: [{ id, host, source, destination, response, requester, notes,
-    // valid_from, valid_until, creative_services, job_number, can_review, approve_url, reject_url }]
+    // Pending requests: [{ id, kind, host, source, destination, response, requester, notes,
+    // valid_from, valid_until, creative_services, job_number, can_review, approve_url, reject_url }],
+    // and tagged-only ones: [{ id, kind, destination, fields, suppress_utm, requester, notes,
+    // creative_services, job_number, can_review, approve_url, reject_url }]
     redirects: { type: Array, default: () => [] },
 });
 
@@ -136,12 +142,28 @@ async function confirmReject(row) {
                     >
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="text-sm font-medium">
+                                <template v-if="row.kind === 'tagged'">
+                                    <p class="text-sm font-medium">
+                                        {{ __('Tagged URL only') }}:
+                                        <code>{{ row.destination }}</code>
+                                    </p>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        <span v-for="(value, name) in row.fields" :key="name"><code>{{ name }}</code>={{ value }} · </span>
+                                        <span v-if="row.suppress_utm">{{ __('utm_ parameters left off') }} · </span>
+                                        <span class="font-medium">
+                                            {{ __('Creative Services') }}:
+                                            <template v-if="row.creative_services">{{ __('Yes') }}, {{ __('job number') }} {{ row.job_number }}</template>
+                                            <template v-else>{{ __('No') }}</template>
+                                        </span>
+                                        <span v-if="row.requester"> · {{ __('Requester') }}: {{ row.requester }}</span>
+                                    </p>
+                                </template>
+                                <p v-else class="text-sm font-medium">
                                     <code>{{ row.host }}{{ row.source }}</code>
                                     <span class="text-gray-400">&rarr;</span>
                                     <code>{{ row.destination }}</code>
                                 </p>
-                                <p class="mt-1 text-xs text-gray-500">
+                                <p v-if="row.kind !== 'tagged'" class="mt-1 text-xs text-gray-500">
                                     {{ __('Type') }}: {{ row.response }}
                                     <span v-if="row.requester"> · {{ __('Requester') }}: {{ row.requester }}</span>
                                     <span class="font-medium">

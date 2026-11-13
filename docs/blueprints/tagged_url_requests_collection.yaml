@@ -1,0 +1,9 @@
+title: 'Tagged URL Requests'
+icon: link
+sites:
+  - default
+propagate: false
+revisions: false
+slugs: false
+sort_by: title
+sort_dir: asc

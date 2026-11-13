@@ -11,6 +11,7 @@ use Statamic\CP\Navigation\Nav as Navigation;
 use Statamic\CP\Navigation\NavItem;
 use Statamic\Entries\Collection as StatamicCollection;
 use Statamic\Facades\Blueprint as BlueprintFacade;
+use Statamic\Facades\Collection;
 use Statamic\Facades\CP\Nav;
 use Statamic\Facades\Fieldset;
 use Statamic\Facades\GlobalSet;
@@ -26,7 +27,9 @@ use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
+use UAMSWeb\Aether\Redirects\Services\TaggedUrlRequestStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
@@ -236,3 +239,17 @@ it('adds the pending domain requests to the pending count', function (int $globa
     'domain only' => [0, 2, 'Review Redirects (2)'],
     'both' => [1, 2, 'Review Redirects (3)'],
 ]);
+
+it('counts a pending tagged-only request in the review queue label', function (): void {
+    // The host keeps tagged-only requests (UAMS-Web/aether-redirects#18)
+    $collection = Collection::make(TaggedUrlRequestStore::COLLECTION);
+    Assert::assertInstanceOf(StatamicCollection::class, $collection);
+    $collection->save();
+
+    app(TaggedUrlRequestStore::class)->create(new TaggedUrlRequest('https://www.uams.edu/'), null, null, 'creator', false, null);
+    app(MarketingRedirectStore::class)->create(MarketingRedirect::fromInput(['source' => '/pending', 'destination' => '/target']));
+
+    marketingRedirectRegistrationSignIn([MarketingRedirectController::APPROVE_PERMISSION]);
+
+    expect(array_keys(marketingRedirectRegistrationNavItems()))->toContain('Review Redirects (2)');
+});

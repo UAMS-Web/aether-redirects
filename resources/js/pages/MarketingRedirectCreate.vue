@@ -26,6 +26,10 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * request an ordinary redirect again; a user who can only make short links
  * cannot type one.
  *
+ * "Tagged URL only" asks for a tagged URL with no vanity URL
+ * (UAMS-Web/aether-redirects#18): the vanity fields are hidden and not sent, and
+ * the tagged URL is issued once an approver approves the request.
+ *
  * Every request answers whether it involves Creative Services, and a "yes" asks for
  * the job number (UAMS-Web/aether-redirects#25). The answer is made on purpose, with
  * no default, and the server refuses a vanity domain request that answers no.
@@ -47,6 +51,8 @@ const props = defineProps({
     canApprove: { type: Boolean, default: false },
     // Domains where a blank source asks the server to generate a back-half
     generatedHosts: { type: Array, default: () => [] },
+    // Whether the site keeps tagged-only requests, and so offers them
+    taggedAvailable: { type: Boolean, default: false },
     // The job number format in words, from the add-on's `creative_services` setting
     jobNumberDescription: { type: String, default: '' },
 });
@@ -59,6 +65,7 @@ const shortLinksOnly = computed(() => !props.canCreateRedirects && props.shortLi
 
 // A blank submission, reused to reset the form after a successful create.
 const blankForm = () => ({
+    kind: 'redirect',
     host: shortLinksOnly.value ? props.shortLinkHost : '',
     short_link: shortLinksOnly.value,
     source: '',
@@ -68,9 +75,27 @@ const blankForm = () => ({
     valid_until: '',
     requester: '',
     notes: '',
+    utm_campaign: '',
+    utm_id: '',
+    utm_marketing_tactic: '',
+    suppress_utm: false,
     creative_services: '',
     job_number: '',
 });
+
+// The fields each kind of request sends; the server refuses the vanity fields on a tagged-only request.
+const fieldsByKind = {
+    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'creative_services', 'job_number', 'requester', 'notes'],
+    tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'creative_services', 'job_number', 'requester', 'notes'],
+};
+
+// Whether the form asks for a tagged URL alone.
+const taggedOnly = computed(() => form.value.kind === 'tagged');
+
+// The submission for the chosen kind of request.
+function payload() {
+    return Object.fromEntries(fieldsByKind[form.value.kind].map((field) => [field, form.value[field]]));
+}
 
 const form = ref(blankForm());
 const errors = ref({});
@@ -168,7 +193,7 @@ async function submit() {
     successMessage.value = null;
 
     try {
-        const { data } = await instance.$axios.post(props.storeUrl, form.value);
+        const { data } = await instance.$axios.post(props.storeUrl, payload());
 
         // Report success and clear the form for the next redirect.
         successMessage.value = data.message;
@@ -179,7 +204,7 @@ async function submit() {
         if (error.response && error.response.status === 422) {
             errors.value = error.response.data.errors || {};
         } else {
-            errors.value = { source: [__('Something went wrong. Please try again.')] };
+            errors.value = { destination: [__('Something went wrong. Please try again.')] };
         }
     } finally {
         saving.value = false;
@@ -205,7 +230,23 @@ async function submit() {
                     v-text="successMessage"
                 />
 
-                <div>
+                <div v-if="taggedAvailable">
+                    <span class="mb-1 block text-sm font-medium">{{ __('Request') }}</span>
+                    <div class="flex gap-4 text-sm">
+                        <label class="flex items-center gap-2">
+                            <input v-model="form.kind" type="radio" name="mr-kind" value="redirect" />
+                            {{ __('Vanity URL') }}
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input v-model="form.kind" type="radio" name="mr-kind" value="tagged" />
+                            {{ __('Tagged URL only') }}
+                        </label>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">{{ __('A tagged URL only request has no vanity URL. The tagged URL is issued once an approver approves it.') }}</p>
+                    <p v-if="errorFor('kind')" class="mt-1 text-xs text-red-600" v-text="errorFor('kind')" />
+                </div>
+
+                <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-host">{{ __('Domain') }}</label>
                     <select id="mr-host" v-model="form.host" :class="inputClass" :disabled="shortLinksOnly" @change="hostTouched = true">
                         <option v-if="!shortLinksOnly" value="">{{ __('Main site (404 redirect)') }}</option>
@@ -218,7 +259,7 @@ async function submit() {
                     <p v-if="errorFor('host')" class="mt-1 text-xs text-red-600" v-text="errorFor('host')" />
                 </div>
 
-                <div>
+                <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-source">{{ __('Source path') }}</label>
                     <div class="flex gap-2">
                         <input
@@ -257,7 +298,23 @@ async function submit() {
                     <p v-if="errorFor('destination')" class="mt-1 text-xs text-red-600" v-text="errorFor('destination')" />
                 </div>
 
-                <div>
+                <template v-if="taggedOnly">
+                    <div v-for="field in ['utm_campaign', 'utm_id', 'utm_marketing_tactic']" :key="field">
+                        <label class="mb-1 block text-sm font-medium" :for="`mr-${field}`"><code>{{ field }}</code></label>
+                        <input :id="`mr-${field}`" v-model="form[field]" type="text" :class="inputClass" autocomplete="off" />
+                        <p v-if="errorFor(field)" class="mt-1 text-xs text-red-600" v-text="errorFor(field)" />
+                    </div>
+
+                    <div>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input v-model="form.suppress_utm" type="checkbox" />
+                            {{ __('Leave the utm_ parameters off the URL') }}
+                        </label>
+                        <p v-if="errorFor('suppress_utm')" class="mt-1 text-xs text-red-600" v-text="errorFor('suppress_utm')" />
+                    </div>
+                </template>
+
+                <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-response">{{ __('Redirect type') }}</label>
                     <select id="mr-response" v-model="form.response" :class="inputClass">
                         <option v-for="option in responseOptions" :key="option.value" :value="option.value">
@@ -267,7 +324,7 @@ async function submit() {
                     <p v-if="errorFor('response')" class="mt-1 text-xs text-red-600" v-text="errorFor('response')" />
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div v-if="!taggedOnly" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium" for="mr-valid-from">{{ __('Valid from') }}</label>
                         <input id="mr-valid-from" v-model="form.valid_from" type="date" :class="inputClass" />
@@ -320,7 +377,7 @@ async function submit() {
 
                 <div class="flex items-center justify-end gap-3">
                     <Button type="submit" variant="primary" :disabled="saving">
-                        {{ saving ? __('Creating…') : __('Create Redirect') }}
+                        {{ saving ? __('Creating…') : taggedOnly ? __('Request Tagged URL') : __('Create Redirect') }}
                     </Button>
                 </div>
             </form>
