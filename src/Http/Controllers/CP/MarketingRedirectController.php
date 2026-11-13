@@ -19,11 +19,13 @@ use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
+use UAMSWeb\Aether\Redirects\Services\TaggedUrlRequestStore;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 
 /**
  * Drives the marketing-redirect creation utility (UAMS-Web/uams-statamic-archive#1355).
@@ -47,6 +49,11 @@ use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
  * (UAMS-Web/aether-redirects#15): 7 base-62 characters never issued on that
  * domain in any case. Approval checks it again, so two pending requests whose
  * back-halves differ only in case cannot both go live.
+ *
+ * A request for a tagged URL alone, with no vanity URL, is made on the same
+ * screen and reviewed in the same queue (UAMS-Web/aether-redirects#18). It is an
+ * entry of the `tagged_url_requests` collection, never a redirect, and approving
+ * it issues its tagged URL.
  */
 class MarketingRedirectController extends CpController
 {
@@ -59,6 +66,11 @@ class MarketingRedirectController extends CpController
      * The permission required to approve or reject a redirect request (UAMS-Web/uams-statamic-archive#1357).
      */
     public const string APPROVE_PERMISSION = 'approve marketing redirects';
+
+    /**
+     * The `kind` a submission carries to request a tagged URL alone (UAMS-Web/aether-redirects#18).
+     */
+    public const string KIND_TAGGED = 'tagged';
 
     /**
      * Render the marketing-redirect creation screen.
@@ -75,6 +87,7 @@ class MarketingRedirectController extends CpController
             'hostOptions' => $this->hostOptions(),
             'canApprove' => $this->canApprove(),
             'generatedHosts' => RedirectHosts::vanity(),
+            'taggedAvailable' => TaggedUrlRequestStore::available(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
                 ['value' => '302', 'label' => __('302 Found')],
@@ -89,10 +102,16 @@ class MarketingRedirectController extends CpController
         Request $request,
         MarketingRedirectStore $globalStore,
         RedirectDomainStore $domainStore,
-        RedirectCollisionDetector $detector
+        RedirectCollisionDetector $detector,
+        TaggedUrlRequestStore $taggedStore
     ): JsonResponse {
         // Gate the write behind the same permission as the screen.
         $this->authorize(self::PERMISSION);
+
+        // A request for a tagged URL alone has none of the vanity fields (UAMS-Web/aether-redirects#18).
+        if ($request->input('kind') === self::KIND_TAGGED) {
+            return $this->storeTagged($request, $taggedStore);
+        }
 
         // Validate the raw submission before building the typed model.
         $validated = $this->validateInput($request);
@@ -176,27 +195,31 @@ class MarketingRedirectController extends CpController
     /**
      * Render the review queue of redirects awaiting approval (UAMS-Web/uams-statamic-archive#1357).
      */
-    public function index(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): InertiaResponse
+    public function index(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore, TaggedUrlRequestStore $taggedStore): InertiaResponse
     {
         // Only approvers may open the review queue.
         $this->authorize(self::APPROVE_PERMISSION);
 
         // Hand the Vue screen the pending requests, each with its action URLs.
         return Inertia::render('aether-redirects::MarketingRedirectReview', [
-            'redirects' => $this->pendingPayload($globalStore, $domainStore),
+            'redirects' => $this->pendingPayload($globalStore, $domainStore, $taggedStore),
         ]);
     }
 
     /**
      * Approve a pending redirect so it begins serving (UAMS-Web/uams-statamic-archive#1357).
      */
-    public function approve(string $redirect, MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): JsonResponse
-    {
+    public function approve(
+        string $redirect,
+        MarketingRedirectStore $globalStore,
+        RedirectDomainStore $domainStore,
+        TaggedUrlRequestStore $taggedStore
+    ): JsonResponse {
         // Only approvers may approve, and never their own request.
         $this->authorize(self::APPROVE_PERMISSION);
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
-        $store = $this->storeHolding($redirect, $globalStore, $domainStore);
+        $store = $this->storeHolding($redirect, $globalStore, $domainStore, $taggedStore);
         $pending = $this->reviewableRow($redirect, $store);
 
         if ($pending instanceof JsonResponse) {
@@ -218,9 +241,7 @@ class MarketingRedirectController extends CpController
 
         return response()->json([
             'saved' => true,
-            'message' => $store instanceof RedirectDomainStore
-                ? __('Redirect approved. It now serves on its domain.')
-                : __('Redirect approved. It now serves on a 404 for every site.'),
+            'message' => $this->approvedMessage($store, $row),
             'redirect' => $row,
         ]);
     }
@@ -232,7 +253,8 @@ class MarketingRedirectController extends CpController
         Request $request,
         string $redirect,
         MarketingRedirectStore $globalStore,
-        RedirectDomainStore $domainStore
+        RedirectDomainStore $domainStore,
+        TaggedUrlRequestStore $taggedStore
     ): JsonResponse {
         // Only approvers may reject, and never their own request.
         $this->authorize(self::APPROVE_PERMISSION);
@@ -244,7 +266,7 @@ class MarketingRedirectController extends CpController
         ]);
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
-        $store = $this->storeHolding($redirect, $globalStore, $domainStore);
+        $store = $this->storeHolding($redirect, $globalStore, $domainStore, $taggedStore);
         $pending = $this->reviewableRow($redirect, $store);
 
         if ($pending instanceof JsonResponse) {
@@ -315,6 +337,110 @@ class MarketingRedirectController extends CpController
 
         // Only a fully-bounded window can be inverted.
         return $from instanceof CarbonImmutable && $until instanceof CarbonImmutable && $from->gt($until);
+    }
+
+    /**
+     * Validate and save a request for a tagged URL alone (UAMS-Web/aether-redirects#18).
+     *
+     * The request is saved pending and issues no tagged URL until an approver
+     * approves it. The vanity fields are refused rather than ignored, so a
+     * submission that meant to ask for a vanity URL is not silently saved without one.
+     *
+     * @param  Request  $request  The incoming create request
+     * @param  TaggedUrlRequestStore  $store  The tagged-only request store
+     * @return JsonResponse The stored request, or a 422
+     */
+    private function storeTagged(Request $request, TaggedUrlRequestStore $store): JsonResponse
+    {
+        $rules = [
+            'kind' => ['required', 'string'],
+            'destination' => ['required', 'string', 'max:2048'],
+            TaggedUrlRequestStore::SUPPRESS_FIELD => ['nullable', 'boolean'],
+            'requester' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2048'],
+        ];
+
+        foreach (TaggedUrlRequestStore::requestFields() as $field) {
+            $rules[$field] = ['nullable', 'string', 'max:255'];
+        }
+
+        foreach (['host', 'source', 'response', 'valid_from', 'valid_until'] as $vanityField) {
+            $rules[$vanityField] = ['prohibited'];
+        }
+
+        /** @var array<string, mixed> $validated */
+        $validated = $request->validate($rules);
+
+        // A host without the collection cannot keep the request, and saying so beats a server error
+        if (! TaggedUrlRequestStore::available()) {
+            return $this->unprocessable('kind', __('Tagged URL requests are not set up on this site.'));
+        }
+
+        $fields = [];
+
+        foreach (TaggedUrlRequestStore::requestFields() as $field) {
+            $value = $validated[$field] ?? null;
+
+            if (\is_string($value) && trim($value) !== '') {
+                $fields[$field] = trim($value);
+            }
+        }
+
+        /** @var string $destination */
+        $destination = $validated['destination'];
+
+        $row = $store->create(
+            new TaggedUrlRequest(
+                destination: trim($destination),
+                fields: $fields,
+                suppressUtm: (bool) ($validated[TaggedUrlRequestStore::SUPPRESS_FIELD] ?? false),
+            ),
+            self::optionalText($validated['requester'] ?? null),
+            self::optionalText($validated['notes'] ?? null),
+            $this->currentUserId(),
+        );
+
+        return response()->json([
+            'saved' => true,
+            'message' => __('Tagged URL request submitted for review. The tagged URL is issued once an approver approves it.'),
+            'redirect' => $row,
+        ], 201);
+    }
+
+    /**
+     * A trimmed free-text value, or null when it is missing or blank.
+     *
+     * @param  mixed  $value  The validated value
+     */
+    private static function optionalText(mixed $value): ?string
+    {
+        if (! \is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * The message confirming an approval.
+     *
+     * @param  RedirectRequestStore  $store  The store holding the approved request
+     * @param  array<string, mixed>|null  $row  The approved row
+     * @return string What the approver is told
+     */
+    private function approvedMessage(RedirectRequestStore $store, ?array $row): string
+    {
+        if ($store instanceof TaggedUrlRequestStore) {
+            $url = $row[TaggedUrlRequestStore::TAGGED_URL_FIELD] ?? null;
+
+            return __('Tagged URL approved and issued: :url', ['url' => \is_string($url) ? $url : '']);
+        }
+
+        return $store instanceof RedirectDomainStore
+            ? __('Redirect approved. It now serves on its domain.')
+            : __('Redirect approved. It now serves on a 404 for every site.');
     }
 
     /**
@@ -455,17 +581,21 @@ class MarketingRedirectController extends CpController
      * a `can_review` flag — false for a request the current user submitted, so
      * the screen can disable the actions the server also forbids (UAMS-Web/uams-statamic-archive#1357).
      *
+     * A tagged-only request (UAMS-Web/aether-redirects#18) has no domain or source,
+     * and carries its request fields and suppress flag for the approver to confirm.
+     *
      * @param  MarketingRedirectStore  $globalStore  The main-site redirect store
      * @param  RedirectDomainStore  $domainStore  The redirect domain store
+     * @param  TaggedUrlRequestStore  $taggedStore  The tagged-only request store
      * @return list<array<string, mixed>> The pending requests ready for the screen
      */
-    private function pendingPayload(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): array
+    private function pendingPayload(MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore, TaggedUrlRequestStore $taggedStore): array
     {
         // Resolve the current approver once for the self-review comparison.
         $currentUserId = $this->currentUserId();
 
-        // Map each pending row to the shape the review screen consumes.
-        return array_map(static function (array $row) use ($currentUserId): array {
+        // Map each pending redirect row to the shape the review screen consumes.
+        $redirects = array_map(static function (array $row) use ($currentUserId): array {
             // The '' fallback cannot render: a row without an id fails the action
             // URL generation below either way, and every row the store writes
             // carries an id.
@@ -475,6 +605,7 @@ class MarketingRedirectController extends CpController
 
             return [
                 'id' => $id,
+                'kind' => 'redirect',
                 'host' => RedirectHosts::normalize($row['host'] ?? null),
                 'source' => \is_string($row['source'] ?? null) ? $row['source'] : '',
                 'destination' => \is_string($row['target_url'] ?? null) ? $row['target_url'] : '',
@@ -488,6 +619,37 @@ class MarketingRedirectController extends CpController
                 'reject_url' => cp_route('marketing-redirects.reject', ['redirect' => $id]),
             ];
         }, [...$globalStore->pending(), ...$domainStore->pending()]);
+
+        return [...$redirects, ...array_map(fn (array $row): array => $this->taggedPayload($row, $currentUserId), $taggedStore->pending())];
+    }
+
+    /**
+     * The review-screen shape of a pending tagged-only request (UAMS-Web/aether-redirects#18).
+     *
+     * @param  array<string, mixed>  $row  The stored request
+     * @param  string|null  $currentUserId  The current approver's id
+     * @return array<string, mixed> The request ready for the screen
+     */
+    private function taggedPayload(array $row, ?string $currentUserId): array
+    {
+        // Every row the store writes carries an id, as above
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
+        $id = \is_string($row['id'] ?? null) ? $row['id'] : '';
+        $submittedBy = \is_string($row['submitted_by'] ?? null) ? $row['submitted_by'] : null;
+        $choices = TaggedUrlRequestStore::choices($row);
+
+        return [
+            'id' => $id,
+            'kind' => self::KIND_TAGGED,
+            'destination' => $choices->destination,
+            'fields' => $choices->fields,
+            'suppress_utm' => $choices->suppressUtm,
+            'requester' => \is_string($row['requester'] ?? null) ? $row['requester'] : null,
+            'notes' => \is_string($row['notes'] ?? null) ? $row['notes'] : null,
+            'can_review' => $submittedBy === null || $submittedBy !== $currentUserId,
+            'approve_url' => cp_route('marketing-redirects.approve', ['redirect' => $id]),
+            'reject_url' => cp_route('marketing-redirects.reject', ['redirect' => $id]),
+        ];
     }
 
     /**
@@ -556,16 +718,25 @@ class MarketingRedirectController extends CpController
     /**
      * The store that holds a request.
      *
-     * An id that is in neither store goes to the domain store, whose lookup reports it as not found.
+     * An id that is in no store goes to the domain store, whose lookup reports it as not found.
      *
      * @param  string  $id  The request id
      * @param  MarketingRedirectStore  $globalStore  The main-site redirect store
      * @param  RedirectDomainStore  $domainStore  The redirect domain store
+     * @param  TaggedUrlRequestStore  $taggedStore  The tagged-only request store
      * @return RedirectRequestStore The store holding the request, or the domain store when none does
      */
-    private function storeHolding(string $id, MarketingRedirectStore $globalStore, RedirectDomainStore $domainStore): RedirectRequestStore
-    {
-        return $globalStore->find($id) === null ? $domainStore : $globalStore;
+    private function storeHolding(
+        string $id,
+        MarketingRedirectStore $globalStore,
+        RedirectDomainStore $domainStore,
+        TaggedUrlRequestStore $taggedStore
+    ): RedirectRequestStore {
+        if ($globalStore->find($id) !== null) {
+            return $globalStore;
+        }
+
+        return $taggedStore->find($id) === null ? $domainStore : $taggedStore;
     }
 
     /**

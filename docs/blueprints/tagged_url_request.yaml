@@ -1,0 +1,95 @@
+title: 'Tagged URL request'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Request
+        instructions: 'A request for a tagged URL with no vanity URL. The marketing redirect utility creates these and its review queue approves them; nothing serves from this collection. Copy this blueprint into the host as `collections/tagged_url_requests/tagged_url_request`, and the collection file `tagged_url_requests_collection.yaml` as `content/collections/tagged_url_requests.yaml`.'
+        fields:
+          -
+            handle: destination
+            field:
+              type: text
+              display: Destination
+              instructions: 'The URL the tag is added to.'
+              validate:
+                - required
+              listable: true
+          -
+            handle: utm_campaign
+            field:
+              type: text
+              display: utm_campaign
+              width: 33
+          -
+            handle: utm_id
+            field:
+              type: text
+              display: utm_id
+              width: 33
+          -
+            handle: utm_marketing_tactic
+            field:
+              type: text
+              display: utm_marketing_tactic
+              width: 33
+          -
+            handle: suppress_utm
+            field:
+              type: toggle
+              display: 'Leave the utm_ parameters off'
+          -
+            handle: requester
+            field:
+              type: text
+              display: Requester
+          -
+            handle: notes
+            field:
+              type: textarea
+              display: Notes
+      -
+        display: Approval
+        instructions: 'Fields the utility writes. The tagged URL is composed and stored when an approver approves the request, so a later change to a parameter or a lookup list does not change it.'
+        fields:
+          -
+            handle: status
+            field:
+              type: select
+              display: Status
+              options:
+                pending: Pending
+                approved: Approved
+                rejected: Rejected
+              listable: true
+              filterable: true
+              width: 33
+          -
+            handle: tagged_url
+            field:
+              type: text
+              display: 'Tagged URL'
+              instructions: 'Issued when the request is approved.'
+              read_only: true
+              listable: true
+          -
+            handle: submitted_by
+            field:
+              type: text
+              display: 'Submitted by'
+              read_only: true
+              width: 33
+          -
+            handle: reviewed_by
+            field:
+              type: text
+              display: 'Reviewed by'
+              read_only: true
+              width: 33
+          -
+            handle: rejection_reason
+            field:
+              type: textarea
+              display: 'Rejection reason'
+              read_only: true

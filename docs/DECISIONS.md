@@ -111,3 +111,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Rejected.** A "value comes from" mapping per standard parameter on the global: more fields for a mapping no site needs to change. Treating the channel as a request field whose options are one named list: the source step would then be the only step without a pointer and a fallback.
 
 **Companion.** `UAMS-Web/aether-redirects#26`, `UAMS-Web/aether-redirects#45`.
+
+## 2026-11-13: A tagged-only request is an entry of its own collection, and approval composes and keeps its URL (#18)
+
+**Decision.** A request for a tagged URL with no vanity URL is made on the same create screen (a "Tagged URL only" choice, sent as `kind: tagged`) and reviewed in the same queue, under the same no-self-approval rule. It is saved pending as an entry of the host's `tagged_url_requests` collection, never as a `redirects` row or a `redirect_domains` entry. Until the cascade choices of `UAMS-Web/aether-redirects#26` reach the form, its tagged-URL part is the destination, the request fields `utm_campaign`, `utm_id` and `utm_marketing_tactic`, and the suppress flag. Approving it composes the URL with `TaggedUrlComposer` from the host's `tagged_url_parameters` global and stores it on the entry as `tagged_url`, so a later change to a parameter or a list does not change an issued URL. The vanity fields (`host`, `source`, `response`, `valid_from`, `valid_until`) are refused on a tagged-only request rather than ignored. The host copies `docs/blueprints/tagged_url_requests_collection.yaml` and `docs/blueprints/tagged_url_request.yaml`; without the collection the screen does not offer the choice and the endpoint refuses it with a message.
+
+**Why.** Decided by Brent on 2026-11-13. A row with no source in a redirect store would make every serving path, the edge manifest and the collision check responsible for skipping it, and a path that forgot would serve a wrong redirect; a collection nothing serves from cannot. A collection also gives the stored, approved record of every tagged URL that `UAMS-Web/uams-statamic#301` decision 4 asks for, in one place for the reporting residual. Composing at approval uses the assembly `#26` already shipped, and the cascade choices add fields to the same request without changing its shape.
+
+**Rejected.** A `kind: tagged` row with no source in the `redirects` global: no host setup, but it relies on every serving and collision path to exclude it. The destination alone as the issued URL until `#26`: it issues no tag. A tagged URL typed by hand: it is the hand assembly `#301` decision 2 retires.
+
+**Companion.** `UAMS-Web/aether-redirects#18`, `UAMS-Web/aether-redirects#26`, `UAMS-Web/aether-redirects#11`, `UAMS-Web/uams-statamic#301`.
