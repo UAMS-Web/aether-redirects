@@ -432,3 +432,16 @@ it('still approves a vanity request in the same queue with its own message', fun
         ->assertOk()
         ->assertJsonPath('message', 'Redirect approved. It now serves on its domain.');
 });
+
+it('neither offers nor accepts a tagged-only request from a user who can only make short links', function (): void {
+    $shortLinks = mrdUser([MarketingRedirectController::SHORT_LINK_PERMISSION]);
+    test()->actingAs($shortLinks);
+
+    test()->get(mrdRoute('marketing-redirects.create'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('taggedAvailable', false));
+
+    turSubmit($shortLinks)->assertForbidden();
+
+    expect(app(TaggedUrlRequestStore::class)->all())->toBe([]);
+});

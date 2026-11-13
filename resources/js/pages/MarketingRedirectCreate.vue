@@ -20,6 +20,12 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * On a vanity domain the source may be left blank, and the server generates a
  * 7-character back-half for it (UAMS-Web/aether-redirects#15).
  *
+ * A user who can make short links gets a "Generate code" button on go.uams.edu,
+ * which fills the source with a 6-character code and can be pressed again for a
+ * new one (UAMS-Web/aether-redirects#84). Typing a source by hand makes the
+ * request an ordinary redirect again; a user who can only make short links
+ * cannot type one.
+ *
  * "Tagged URL only" asks for a tagged URL with no vanity URL
  * (UAMS-Web/aether-redirects#18): the vanity fields are hidden and not sent, and
  * the tagged URL is issued once an approver approves the request.
@@ -27,6 +33,12 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
     storeUrl: { type: String, required: true },
+    // CP endpoint that draws a short-link code
+    shortCodeUrl: { type: String, default: '' },
+    // Whether the current user can request ordinary redirects, not only short links
+    canCreateRedirects: { type: Boolean, default: true },
+    // The short-link domain, when the current user can make short links there, else null
+    shortLinkHost: { type: String, default: null },
     // Selectable HTTP redirect types ([{ value, label }])
     responseOptions: { type: Array, default: () => [] },
     // Domains a request can be made for, vanity domains first
@@ -42,10 +54,14 @@ const props = defineProps({
 const instance = getCurrentInstance().proxy;
 const __ = (key) => instance.__(key);
 
+// Whether the user can make nothing but short links, so every request is one.
+const shortLinksOnly = computed(() => !props.canCreateRedirects && props.shortLinkHost !== null);
+
 // A blank submission, reused to reset the form after a successful create.
 const blankForm = () => ({
     kind: 'redirect',
-    host: '',
+    host: shortLinksOnly.value ? props.shortLinkHost : '',
+    short_link: shortLinksOnly.value,
     source: '',
     destination: '',
     response: '301',
@@ -61,7 +77,7 @@ const blankForm = () => ({
 
 // The fields each kind of request sends; the server refuses the vanity fields on a tagged-only request.
 const fieldsByKind = {
-    redirect: ['host', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'requester', 'notes'],
+    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'requester', 'notes'],
     tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'requester', 'notes'],
 };
 
@@ -103,7 +119,7 @@ const hostTouched = ref(false);
 watch(
     () => form.value.destination,
     (destination) => {
-        if (!hostTouched.value) {
+        if (!hostTouched.value && !shortLinksOnly.value) {
             form.value.host = proposedHost(destination);
         }
     },
@@ -111,6 +127,45 @@ watch(
 
 // Whether the chosen domain generates a back-half when the source is left blank.
 const generatesBackHalf = computed(() => props.generatedHosts.includes(form.value.host));
+
+// Whether the Generate code button applies to the chosen domain.
+const offersShortCode = computed(() => props.shortLinkHost !== null && form.value.host === props.shortLinkHost);
+
+// Leaving the short-link domain makes the request an ordinary redirect again.
+watch(
+    () => form.value.host,
+    (host) => {
+        if (host !== props.shortLinkHost) {
+            form.value.short_link = false;
+        }
+    },
+);
+
+// A source typed by hand is an ordinary path, unless the user can make only short links.
+function sourceTyped() {
+    if (!shortLinksOnly.value) {
+        form.value.short_link = false;
+    }
+}
+
+const generating = ref(false);
+
+// Draw a code for the short link; pressing again draws a new one.
+async function generateCode() {
+    generating.value = true;
+    errors.value = {};
+
+    try {
+        const { data } = await instance.$axios.post(props.shortCodeUrl);
+
+        form.value.source = data.code;
+        form.value.short_link = true;
+    } catch (error) {
+        errors.value = (error.response && error.response.data.errors) || { source: [__('Something went wrong. Please try again.')] };
+    } finally {
+        generating.value = false;
+    }
+}
 
 const inputClass =
     'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ' +
@@ -185,8 +240,8 @@ async function submit() {
 
                 <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-host">{{ __('Domain') }}</label>
-                    <select id="mr-host" v-model="form.host" :class="inputClass" @change="hostTouched = true">
-                        <option value="">{{ __('Main site (404 redirect)') }}</option>
+                    <select id="mr-host" v-model="form.host" :class="inputClass" :disabled="shortLinksOnly" @change="hostTouched = true">
+                        <option v-if="!shortLinksOnly" value="">{{ __('Main site (404 redirect)') }}</option>
                         <option v-for="host in hostOptions" :key="host" :value="host">{{ host }}</option>
                     </select>
                     <p class="mt-1 text-xs text-gray-500">
@@ -198,17 +253,25 @@ async function submit() {
 
                 <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-source">{{ __('Source path') }}</label>
-                    <input
-                        id="mr-source"
-                        v-model="form.source"
-                        type="text"
-                        :class="inputClass"
-                        :placeholder="generatesBackHalf ? __('Leave blank to generate one') : '/flu-shot'"
-                        autocomplete="off"
-                    />
+                    <div class="flex gap-2">
+                        <input
+                            id="mr-source"
+                            v-model="form.source"
+                            type="text"
+                            :class="inputClass"
+                            :readonly="shortLinksOnly"
+                            :placeholder="generatesBackHalf ? __('Leave blank to generate one') : '/flu-shot'"
+                            autocomplete="off"
+                            @input="sourceTyped"
+                        />
+                        <Button v-if="offersShortCode" type="button" :disabled="generating" @click="generateCode">
+                            {{ form.short_link ? __('Generate another') : __('Generate code') }}
+                        </Button>
+                    </div>
                     <p class="mt-1 text-xs text-gray-500">
                         {{ __('The path to redirect from, relative to the site root.') }}
                         <span v-if="generatesBackHalf">{{ __('Leave it blank to get a generated 7-character back-half, shown when the request is submitted.') }}</span>
+                        <span v-if="offersShortCode">{{ __('Generate code makes a short link with a 6-character code. It goes live at once when the destination is on a UAMS domain, and waits for an approver otherwise.') }}</span>
                     </p>
                     <p v-if="errorFor('source')" class="mt-1 text-xs text-red-600" v-text="errorFor('source')" />
                 </div>
