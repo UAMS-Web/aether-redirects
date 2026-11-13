@@ -110,6 +110,10 @@ final readonly class CreativeServices
             throw new LogicException(sprintf('The "%s" setting is not a valid regular expression.', self::PATTERN_KEY));
         }
 
-        return $matched === 1 ? null : __('The job number must match :format.', ['format' => self::description()]);
+        if ($matched === 1) {
+            return null;
+        }
+
+        return __('The job number must match :format.', ['format' => self::description()]);
     }
 }

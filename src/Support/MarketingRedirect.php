@@ -57,6 +57,7 @@ final readonly class MarketingRedirect
      * @param  string|null  $submittedBy  The Control Panel user id that created the request (for the no-self-approve gate, UAMS-Web/uams-statamic-archive#1357)
      * @param  string|null  $host  The redirect domain the rule serves on, or null for the main site's `redirects` global (UAMS-Web/aether-redirects#83)
      * @param  bool  $generatedBackHalf  Whether the source is a generated back-half rather than a path the requester typed (UAMS-Web/aether-redirects#15)
+     * @param  bool  $approvedOnCreate  Whether the row is saved approved instead of pending: a short link whose destination is trusted (UAMS-Web/aether-redirects#84)
      * @param  bool  $creativeServices  Whether the request involves Creative Services (UAMS-Web/aether-redirects#25)
      * @param  string|null  $jobNumber  The Creative Services job number, set only when the request involves Creative Services
      */
@@ -70,6 +71,7 @@ final readonly class MarketingRedirect
         public ?string $submittedBy = null,
         public ?string $host = null,
         public bool $generatedBackHalf = false,
+        public bool $approvedOnCreate = false,
         public bool $creativeServices = false,
         public ?string $jobNumber = null,
     ) {}
@@ -137,6 +139,35 @@ final readonly class MarketingRedirect
     }
 
     /**
+     * Return this redirect as a short link with a generated code as its source
+     * (UAMS-Web/aether-redirects#84).
+     *
+     * The code is marked generated, as a back-half is, so approval checks it is
+     * still unissued. A code whose destination is trusted is saved approved.
+     *
+     * @param  string  $code  The generated code
+     * @param  bool  $approved  Whether to save it approved, because its destination is trusted
+     * @return self The same redirect, sourced from the code
+     */
+    public function withShortCode(string $code, bool $approved): self
+    {
+        return new self(
+            source: RedirectSource::normalize($code),
+            destination: $this->destination,
+            response: $this->response,
+            window: $this->window,
+            requester: $this->requester,
+            notes: $this->notes,
+            submittedBy: $this->submittedBy,
+            host: $this->host,
+            generatedBackHalf: true,
+            approvedOnCreate: $approved,
+            creativeServices: $this->creativeServices,
+            jobNumber: $this->jobNumber,
+        );
+    }
+
+    /**
      * Render this redirect as a `redirect` replicator row for the `redirects`
      * global.
      *
@@ -144,9 +175,11 @@ final readonly class MarketingRedirect
      * testable); every other key mirrors what {@see FindRedirectRule}
      * reads, with the validity window flattened back to `Y-m-d` date strings.
      *
-     * A utility-created redirect always enters the queue as {@see RedirectStatus::Pending}
+     * A utility-created redirect enters the queue as {@see RedirectStatus::Pending}
      * (UAMS-Web/uams-statamic-archive#1357) — it is `enabled` but does not serve until an approver promotes it,
-     * so both flags are stamped here and the review metadata starts empty.
+     * so both flags are stamped here and the review metadata starts empty. The one
+     * exception is a short link to a trusted destination, saved
+     * {@see RedirectStatus::Approved} (UAMS-Web/aether-redirects#84).
      *
      * @param  string  $id  The replicator row id (assigned by the store)
      * @return array<string, mixed> The stored redirect row
@@ -157,7 +190,7 @@ final readonly class MarketingRedirect
             'id' => $id,
             'type' => self::SET_HANDLE,
             'enabled' => true,
-            'status' => RedirectStatus::Pending->value,
+            'status' => ($this->approvedOnCreate ? RedirectStatus::Approved : RedirectStatus::Pending)->value,
             'source' => $this->source,
             'use_regex' => false,
             'target_type' => 'url',

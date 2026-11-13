@@ -101,6 +101,7 @@ it('refuses a job number that is not text', function (): void {
     $response = mrdSubmit(mrdCreator(), ['creative_services' => 'yes', 'job_number' => ['12345']]);
 
     $response->assertUnprocessable();
+
     expect($response->json('errors.job_number.0'))->toBe('Must be a string.');
 });
 
@@ -132,6 +133,7 @@ it('keeps the answer and job number on a generated back-half request', function 
     $response = mrdSubmit(mrdCreator(), ['source' => '', 'creative_services' => 'yes', 'job_number' => '555']);
 
     $response->assertCreated();
+
     expect($response->json('redirect.job_number'))->toBe('555');
 });
 

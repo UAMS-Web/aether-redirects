@@ -179,6 +179,49 @@ it('swaps in a generated back-half, keeping its case and every other field', fun
         ->and($generated->toDomainData('uams.info')['generated_back_half'])->toBeTrue();
 });
 
+it('becomes a short link with a generated code, approved or pending, keeping every other field', function (bool $approved, string $status): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '',
+        'destination' => 'https://example.org/campaign',
+        'response' => '302',
+        'valid_from' => '2026-01-01',
+        'valid_until' => '2026-12-31',
+        'requester' => 'Communications',
+        'notes' => 'Spring',
+        'host' => 'go.uams.edu',
+    ], 'user-1');
+
+    $link = $redirect->withShortCode('abc234', $approved);
+    $data = $link->toDomainData('record-id');
+
+    expect($redirect->approvedOnCreate)->toBeFalse()
+        ->and($redirect->toRow('x')['status'])->toBe('pending')
+        ->and($link->approvedOnCreate)->toBe($approved)
+        ->and($link->generatedBackHalf)->toBeTrue()
+        ->and($link->source)->toBe('/abc234')
+        ->and($link->destination)->toBe('https://example.org/campaign')
+        ->and($link->response)->toBe('302')
+        ->and($link->window)->toBe($redirect->window)
+        ->and($link->requester)->toBe('Communications')
+        ->and($link->notes)->toBe('Spring')
+        ->and($link->submittedBy)->toBe('user-1')
+        ->and($link->host)->toBe('go.uams.edu')
+        ->and($link->toRow('x')['status'])->toBe($status)
+        ->and($data['status'])->toBe($status)
+        ->and($data['generated_back_half'])->toBeTrue()
+        ->and($data['reviewed_by'])->toBeNull();
+})->with([
+    'a trusted destination' => [true, 'approved'],
+    'any other destination' => [false, 'pending'],
+]);
+
+it('keeps a generated back-half pending', function (): void {
+    $redirect = MarketingRedirect::fromInput(['source' => '', 'destination' => '/y', 'host' => 'uams.info']);
+
+    expect($redirect->withGeneratedBackHalf('aB3xY9q')->approvedOnCreate)->toBeFalse()
+        ->and($redirect->withGeneratedBackHalf('aB3xY9q')->toRow('x')['status'])->toBe('pending');
+});
+
 it('leaves the host null when none is given or it is not a domain', function (?string $host): void {
     $redirect = MarketingRedirect::fromInput(['source' => '/x', 'destination' => '/y', 'host' => $host]);
 
@@ -222,4 +265,16 @@ it('defaults to a request that does not involve Creative Services', function ():
 
     expect($redirect->creativeServices)->toBeFalse()
         ->and($redirect->jobNumber)->toBeNull();
+});
+
+it('carries the Creative Services answer onto a short code', function (): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => '',
+        'destination' => '/target',
+        'creative_services' => 'yes',
+        'job_number' => '12345',
+    ])->withShortCode('abc234', true);
+
+    expect($redirect->creativeServices)->toBeTrue()
+        ->and($redirect->jobNumber)->toBe('12345');
 });

@@ -28,6 +28,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
+use UAMSWeb\Aether\Redirects\Support\ShortCode;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
 
 /**
@@ -67,6 +68,7 @@ class ServiceProvider extends AddonServiceProvider
     public function register(): void
     {
         $this->app->bind(BackHalf::GENERATOR, static fn (): RandomCode => BackHalf::generator());
+        $this->app->bind(ShortCode::GENERATOR, static fn (): RandomCode => ShortCode::generator());
     }
 
     /**
@@ -98,11 +100,12 @@ class ServiceProvider extends AddonServiceProvider
     }
 
     /**
-     * Register the marketing-redirect workflow's two permissions
+     * Register the marketing-redirect workflow's permissions
      * (UAMS-Web/uams-statamic#398).
      *
      * Requesting and approving are separate permissions, so a requester can be
-     * kept from approving their own request.
+     * kept from approving their own request. Making a `go.uams.edu` short link is
+     * its own permission (UAMS-Web/aether-redirects#84).
      */
     private function bootMarketingRedirectPermissions(): void
     {
@@ -111,6 +114,8 @@ class ServiceProvider extends AddonServiceProvider
                 ->label(__('Create marketing redirects'));
             Permission::register(MarketingRedirectController::APPROVE_PERMISSION)
                 ->label(__('Approve marketing redirects'));
+            Permission::register(MarketingRedirectController::SHORT_LINK_PERMISSION)
+                ->label(__('Create short links'));
             Permission::register(RedirectDomainList::PERMISSION)
                 ->label(__('Manage redirect domains'));
         });
@@ -127,6 +132,7 @@ class ServiceProvider extends AddonServiceProvider
             Route::prefix('redirects/marketing')->name('marketing-redirects.')->group(function (): void {
                 Route::get('/', [MarketingRedirectController::class, 'create'])->name('create');
                 Route::post('/', [MarketingRedirectController::class, 'store'])->name('store');
+                Route::post('short-code', [MarketingRedirectController::class, 'shortCode'])->name('short-code');
                 Route::get('review', [MarketingRedirectController::class, 'index'])->name('review');
                 Route::post('{redirect}/approve', [MarketingRedirectController::class, 'approve'])->name('approve');
                 Route::post('{redirect}/reject', [MarketingRedirectController::class, 'reject'])->name('reject');
@@ -152,8 +158,8 @@ class ServiceProvider extends AddonServiceProvider
                 return;
             }
 
-            // Show the creation utility to users who can request redirects
-            if ($user->can(MarketingRedirectController::PERMISSION)) {
+            // Show the creation utility to users who can request redirects or make short links
+            if ($user->can(MarketingRedirectController::PERMISSION) || $user->can(MarketingRedirectController::SHORT_LINK_PERMISSION)) {
                 /**
                  * @var \Statamic\CP\Navigation\Nav $nav
                  * @var NavItem $item
