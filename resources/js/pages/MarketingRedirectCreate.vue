@@ -1,5 +1,5 @@
 <script setup>
-import { getCurrentInstance, ref } from 'vue';
+import { getCurrentInstance, ref, watch } from 'vue';
 import { Head } from '@statamic/cms/inertia';
 import { Header, Panel, Button } from '@statamic/cms/ui';
 
@@ -11,12 +11,21 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * which normalizes the source, rejects a source collision within an overlapping
  * validity window (UAMS-Web/uams-statamic-archive#1356), and persists the redirect so it serves on a 404 for
  * every site (per UAMS-Web/uams-statamic-archive#1110). Field errors returned as a 422 are shown inline.
+ *
+ * Choosing a domain makes the request a rule on that redirect domain instead
+ * (UAMS-Web/aether-redirects#83). The screen proposes the domain a destination
+ * calls for, the way the server checks it: a `uams.edu` page goes on `uams.info`
+ * and a `uamshealth.com` page on `uams.health`.
  */
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
     storeUrl: { type: String, required: true },
     // Selectable HTTP redirect types ([{ value, label }])
     responseOptions: { type: Array, default: () => [] },
+    // Domains a request can be made for, vanity domains first
+    hostOptions: { type: Array, default: () => [] },
+    // Whether the current user can approve, and so can save a domain that does not suit the destination
+    canApprove: { type: Boolean, default: false },
 });
 
 const instance = getCurrentInstance().proxy;
@@ -24,6 +33,7 @@ const __ = (key) => instance.__(key);
 
 // A blank submission, reused to reset the form after a successful create.
 const blankForm = () => ({
+    host: '',
     source: '',
     destination: '',
     response: '301',
@@ -37,6 +47,37 @@ const form = ref(blankForm());
 const errors = ref({});
 const saving = ref(false);
 const successMessage = ref(null);
+
+// The domain a destination URL calls for, or '' when it calls for none.
+function proposedHost(destination) {
+    let hostname;
+
+    try {
+        hostname = new URL(destination.trim()).hostname.toLowerCase();
+    } catch {
+        return '';
+    }
+
+    const within = (domain) => hostname === domain || hostname.endsWith('.' + domain);
+
+    if (within('uams.edu')) {
+        return 'uams.info';
+    }
+
+    return within('uamshealth.com') ? 'uams.health' : '';
+}
+
+// Whether the person has picked a domain themselves, which a later destination edit leaves alone.
+const hostTouched = ref(false);
+
+watch(
+    () => form.value.destination,
+    (destination) => {
+        if (!hostTouched.value) {
+            form.value.host = proposedHost(destination);
+        }
+    },
+);
 
 const inputClass =
     'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm ' +
@@ -61,6 +102,7 @@ async function submit() {
         // Report success and clear the form for the next redirect.
         successMessage.value = data.message;
         form.value = blankForm();
+        hostTouched.value = false;
     } catch (error) {
         // A 422 carries per-field validation / collision messages to show inline.
         if (error.response && error.response.status === 422) {
@@ -83,7 +125,7 @@ async function submit() {
         <Panel>
             <form class="p-4 space-y-6" @submit.prevent="submit">
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ __('Create a redirect from a short/vanity path to a destination. It serves on a 404 for every site.') }}
+                    {{ __('Create a redirect from a short/vanity path to a destination. It serves on the chosen domain, or on a 404 for every site when no domain is chosen.') }}
                 </p>
 
                 <div
@@ -91,6 +133,19 @@ async function submit() {
                     class="rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-200"
                     v-text="successMessage"
                 />
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium" for="mr-host">{{ __('Domain') }}</label>
+                    <select id="mr-host" v-model="form.host" :class="inputClass" @change="hostTouched = true">
+                        <option value="">{{ __('Main site (404 redirect)') }}</option>
+                        <option v-for="host in hostOptions" :key="host" :value="host">{{ host }}</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('Proposed from the destination: uams.info for a uams.edu page, uams.health for a uamshealth.com page. Choose uamsbaptist.health for a UAMS Health and Baptist Health partnership page.') }}
+                        <span v-if="canApprove">{{ __('As an approver you can save a domain that does not suit the destination.') }}</span>
+                    </p>
+                    <p v-if="errorFor('host')" class="mt-1 text-xs text-red-600" v-text="errorFor('host')" />
+                </div>
 
                 <div>
                     <label class="mb-1 block text-sm font-medium" for="mr-source">{{ __('Source path') }}</label>

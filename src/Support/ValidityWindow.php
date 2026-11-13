@@ -54,6 +54,22 @@ final readonly class ValidityWindow
     }
 
     /**
+     * This window with its end moved out so the path stays reserved afterward
+     * (UAMS-Web/aether-redirects#83).
+     *
+     * A rule whose last day is D reserves its path through the day before D plus
+     * `$weeks` weeks, so a new rule may start exactly `$weeks` weeks after the
+     * last day of use and not a day sooner. An open end stays open.
+     *
+     * @param  int  $weeks  Weeks the path stays reserved after the last day of use
+     * @return self The window with its end extended
+     */
+    public function withReuseBuffer(int $weeks): self
+    {
+        return new self($this->from, $this->until?->addWeeks($weeks)->subDay()->endOfDay());
+    }
+
+    /**
      * Build a window from a stored redirect row's `valid_from` / `valid_until`
      * keys, tolerating absent or non-string values (legacy rows carry neither).
      *

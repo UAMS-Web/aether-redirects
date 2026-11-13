@@ -1,0 +1,68 @@
+title: 'Redirect domain approval fields'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Approval
+        instructions: 'Fields the marketing redirect utility writes to a redirect domain entry. Copy them into the host blueprint `collections/redirect_domains/redirect_domain` so the entry editor shows them. The utility stores and reads them whether or not the blueprint has them, and an entry with no status serves as approved.'
+        fields:
+          -
+            handle: status
+            field:
+              type: select
+              display: Status
+              instructions: 'Only an approved rule serves. The utility sets pending, approved and rejected.'
+              options:
+                pending: Pending
+                approved: Approved
+                rejected: Rejected
+              clearable: true
+              listable: true
+              filterable: true
+              width: 33
+          -
+            handle: valid_from
+            field:
+              type: date
+              display: 'Valid from'
+              instructions: 'Optional. Leave blank to serve immediately once approved.'
+              time_enabled: false
+              width: 33
+          -
+            handle: valid_until
+            field:
+              type: date
+              display: 'Valid until'
+              instructions: 'Optional and inclusive. On uams.info, uams.health and uamsbaptist.health the path stays reserved for 12 weeks after this date.'
+              time_enabled: false
+              width: 33
+          -
+            handle: requester
+            field:
+              type: text
+              display: Requester
+              width: 33
+          -
+            handle: submitted_by
+            field:
+              type: text
+              display: 'Submitted by'
+              instructions: 'The Control Panel user id that created the request.'
+              visibility: read_only
+              width: 33
+          -
+            handle: reviewed_by
+            field:
+              type: text
+              display: 'Reviewed by'
+              instructions: 'The Control Panel user id that approved or rejected the request.'
+              visibility: read_only
+              width: 33
+          -
+            handle: rejection_reason
+            field:
+              type: textarea
+              display: 'Rejection reason'
+              if:
+                status: 'equals rejected'

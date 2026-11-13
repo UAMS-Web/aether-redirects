@@ -55,6 +55,7 @@ final readonly class MarketingRedirect
      * @param  string|null  $requester  Free-text requester attribution
      * @param  string|null  $notes  Free-text notes (e.g. why the redirect exists)
      * @param  string|null  $submittedBy  The Control Panel user id that created the request (for the no-self-approve gate, UAMS-Web/uams-statamic-archive#1357)
+     * @param  string|null  $host  The redirect domain the rule serves on, or null for the main site's `redirects` global (UAMS-Web/aether-redirects#83)
      */
     public function __construct(
         public string $source,
@@ -64,6 +65,7 @@ final readonly class MarketingRedirect
         public ?string $requester = null,
         public ?string $notes = null,
         public ?string $submittedBy = null,
+        public ?string $host = null,
     ) {}
 
     /**
@@ -74,7 +76,7 @@ final readonly class MarketingRedirect
      * is not request data — the controller supplies the authenticated user id so
      * the approval slice can forbid self-approval (UAMS-Web/uams-statamic-archive#1357).
      *
-     * @param  array{source: string, destination: string, response?: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null}  $input  Validated request data
+     * @param  array{source: string, destination: string, response?: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null}  $input  Validated request data
      * @param  string|null  $submittedBy  The Control Panel user id creating the request
      * @return self The typed marketing redirect
      */
@@ -91,6 +93,7 @@ final readonly class MarketingRedirect
             requester: self::cleanOptional($input['requester'] ?? null),
             notes: self::cleanOptional($input['notes'] ?? null),
             submittedBy: self::cleanOptional($submittedBy),
+            host: RedirectHosts::normalize($input['host'] ?? null),
         );
     }
 
@@ -130,6 +133,27 @@ final readonly class MarketingRedirect
             'reviewed_by' => null,
             'rejection_reason' => null,
         ];
+    }
+
+    /**
+     * Render this redirect as the data of a `redirect_domains` entry
+     * (UAMS-Web/aether-redirects#83).
+     *
+     * The same fields as {@see toRow()} without the replicator `id` and `type`, plus
+     * the `host` the entry answers on, so the engine and the edge manifest apply
+     * the same status and validity gates to it as to a global-set row.
+     *
+     * @param  string  $host  The redirect domain the rule serves on
+     * @return array<string, mixed> The entry data
+     */
+    public function toDomainData(string $host): array
+    {
+        // The id is dropped on the next line, so its value never reaches the data
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
+        $row = $this->toRow('');
+        unset($row['id'], $row['type']);
+
+        return ['host' => $host, 'whole_domain' => false, ...$row];
     }
 
     /**

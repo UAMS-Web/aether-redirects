@@ -25,7 +25,7 @@ use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
  * every site with no per-site duplication. Collision detection (UAMS-Web/uams-statamic-archive#1356) therefore
  * compares against this same shared default-site list.
  */
-class MarketingRedirectStore
+class MarketingRedirectStore implements RedirectRequestStore
 {
     /**
      * The handle of the redirects global set.
