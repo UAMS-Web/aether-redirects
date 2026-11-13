@@ -19,6 +19,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 /**
  * Integration coverage for {@see RedirectDomainStore} (UAMS-Web/aether-redirects#83): creating a
@@ -45,6 +46,9 @@ beforeEach(function (): void {
     Assert::assertInstanceOf(StatamicCollection::class, $collection);
 
     $collection->save();
+
+    // The domain the requests name
+    RedirectDomainRecords::idFor('uams.info');
 });
 
 /**

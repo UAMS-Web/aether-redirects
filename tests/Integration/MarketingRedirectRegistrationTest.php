@@ -27,6 +27,7 @@ use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 // Stache-isolated: every Stache store, users included, is re-rooted into this
 // process's throwaway directory, and roles go to a per-test path below.
@@ -214,6 +215,8 @@ it('adds the pending domain requests to the pending count', function (int $globa
             MarketingRedirect::fromInput(['source' => '/pending-'.$i, 'destination' => '/target'])
         );
     }
+
+    RedirectDomainRecords::idFor('uams.info');
 
     for ($i = 0; $i < $domain; $i++) {
         app(RedirectDomainStore::class)->create(

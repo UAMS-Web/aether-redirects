@@ -22,6 +22,7 @@ use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Services\EdgeRedirectManifestBuilder;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 use UAMSWeb\Aether\Redirects\Tests\Support\StacheIsolation;
 use UAMSWeb\Aether\Redirects\Tests\TestCase;
 
@@ -77,7 +78,7 @@ function redirectDomainEntry(array $data, bool $published = true): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published($published);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'enabled' => true,
         'whole_domain' => false,
         'use_regex' => false,
@@ -85,7 +86,7 @@ function redirectDomainEntry(array $data, bool $published = true): StatamicEntry
         'response' => '301',
         'order' => 30,
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
@@ -258,7 +259,7 @@ it('lets an editor find every entry for one host by searching and by filtering o
     expect($listing(['search' => 'uams.health']))->toBe($expected);
 
     // Filtering on the host field returns the same set and nothing from another host
-    $filters = base64_encode((string) json_encode(['fields' => ['host' => ['operator' => '=', 'value' => 'uams.health']]]));
+    $filters = base64_encode((string) json_encode(['fields' => ['host' => ['operator' => '=', 'value' => [RedirectDomainRecords::idFor('uams.health')]]]]));
 
     expect($listing(['filters' => $filters]))->toBe($expected);
 });
@@ -375,7 +376,10 @@ it("writes one manifest per host, each carrying only that host's rules", functio
     redirectDomainEntry(['host' => 'uams.health', 'source' => '/flu', 'target_url' => 'https://uamshealth.com/flu']);
     redirectDomainEntry(['host' => 'UAMS.Health.', 'source' => '/covid', 'target_url' => 'https://uamshealth.com/covid']);
     redirectDomainEntry(['host' => 'uams.health', 'source' => '/draft', 'target_url' => 'https://uamshealth.com/'], published: false);
-    redirectDomainEntry(['host' => 'https://bad host/', 'source' => '/x', 'target_url' => 'https://uams.edu/']);
+    // The domain list refuses a host that is not a domain, so the stored value is changed behind its back
+    $bad = redirectDomainEntry(['host' => 'agec.org', 'source' => '/x', 'target_url' => 'https://uams.edu/']);
+    $bad->set('host', 'https://bad host/');
+    $bad->saveQuietly();
 
     $directory = storage_path('framework/testing/redirect-domain-manifests/'.StacheIsolation::segment(getenv('TEST_TOKEN')));
     File::deleteDirectory($directory);

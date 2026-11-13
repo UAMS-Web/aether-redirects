@@ -26,6 +26,7 @@ use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Support\RedirectRuleMatcher;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 // Stache-isolated: each test saves redirect domain entries.
 uses(IsolatesStache::class);
@@ -79,7 +80,7 @@ function servedRedirectDomainEntry(array $data): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'enabled' => true,
         'whole_domain' => false,
         'use_regex' => false,
@@ -87,7 +88,7 @@ function servedRedirectDomainEntry(array $data): StatamicEntry
         'response' => '301',
         'order' => 30,
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
@@ -289,6 +290,8 @@ it('forwards the request query string as the engine does', function (): void {
 });
 
 it('passes a request for a Statamic site host on, even when the collection names that host', function (): void {
+    // A domain record needs a valid domain, so the application answers on one
+    config()->set('app.url', 'https://enterprise.org');
     $appHost = parse_url(config()->string('app.url'), PHP_URL_HOST);
     Assert::assertIsString($appHost);
 

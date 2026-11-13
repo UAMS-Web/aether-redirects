@@ -1,0 +1,24 @@
+title: 'Redirect domain host field'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Redirect
+        instructions: 'Replaces the free-text `host` field of the host blueprint `collections/redirect_domains/redirect_domain`, so a rule can only name a domain from the domain list. Also change the collection `title_format` to read the record: `{{ host:host }}...`. Then run `php artisan redirects:migrate-domain-hosts` once.'
+        fields:
+          -
+            handle: host
+            field:
+              type: entries
+              display: Domain
+              instructions: 'The domain this rule answers on, chosen from the domain list.'
+              collections:
+                - redirect_hosts
+              max_items: 1
+              create: false
+              validate:
+                - required
+              listable: true
+              filterable: true
+              width: 66

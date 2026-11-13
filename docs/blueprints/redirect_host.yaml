@@ -1,0 +1,20 @@
+title: 'Redirect domain'
+tabs:
+  main:
+    display: Main
+    sections:
+      -
+        display: Domain
+        instructions: 'One record per domain the application trusts. A redirect rule can only name a domain that has a published record here, and creating or changing a record needs the "Manage redirect domains" permission. Copy this blueprint into the host as `collections/redirect_hosts/redirect_host`.'
+        fields:
+          -
+            handle: host
+            field:
+              type: text
+              display: Domain
+              instructions: 'The domain without `https://` or a path. For example: `agec.org`. It is saved lowercased and without a trailing dot.'
+              placeholder: example.org
+              validate:
+                - required
+              listable: true
+              width: 100

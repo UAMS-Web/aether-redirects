@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 // Stache-isolated: each test saves redirect domain entries.
 uses(IsolatesStache::class);
@@ -64,13 +65,13 @@ function middlewareEntry(string $host, array $data = []): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'host' => $host,
         'source' => '/clinic',
         'target_type' => 'url',
         'target_url' => 'https://uamshealth.com/clinic',
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
