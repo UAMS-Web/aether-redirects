@@ -57,7 +57,7 @@ final readonly class RandomCode
     }
 
     /**
-     * Draw codes until one is not taken, and return it.
+     * Draw one code per allowed attempt, and return the first that is not taken.
      *
      * @param  Closure(string): bool  $isTaken  Whether a drawn code is already in use
      * @return string A code the check reported free
@@ -66,13 +66,15 @@ final readonly class RandomCode
      */
     public function generate(Closure $isTaken): string
     {
-        // Try up to the bound, returning the first free draw.
-        for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
-            $code = $this->draw();
+        // Draw one candidate per allowed attempt, then take the first the check
+        // reports free. `array_find()` stops checking at that one. A fixed range has
+        // no loop counter a mutant could turn into a loop that never ends.
+        $candidates = array_map($this->draw(...), range(1, $this->maxAttempts));
 
-            if (! $isTaken($code)) {
-                return $code;
-            }
+        $code = array_find($candidates, static fn (string $candidate): bool => ! $isTaken($candidate));
+
+        if ($code !== null) {
+            return $code;
         }
 
         // Every draw collided: stop rather than loop, with a message the requester can read.
@@ -89,13 +91,12 @@ final readonly class RandomCode
         // The highest valid index into the alphabet.
         $last = \strlen($this->alphabet) - 1;
 
-        // Pick each character independently and uniformly.
-        $code = '';
+        // Pick each character independently and uniformly, one per position.
+        $characters = array_map(
+            fn (): string => $this->alphabet[random_int(0, $last)],
+            range(1, $this->length),
+        );
 
-        for ($position = 0; $position < $this->length; $position++) {
-            $code .= $this->alphabet[random_int(0, $last)];
-        }
-
-        return $code;
+        return implode('', $characters);
     }
 }
