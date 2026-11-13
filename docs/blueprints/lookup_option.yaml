@@ -42,6 +42,19 @@ tabs:
         instructions: 'The list each later step offers once this option is chosen. Leave a step empty to use the list a shallower choice names, then the generic list for that step.'
         fields:
           -
+            handle: source
+            field:
+              type: entries
+              display: 'Source list'
+              instructions: 'The list offered for the source step after this option.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
+          -
             handle: source_platform
             field:
               type: entries

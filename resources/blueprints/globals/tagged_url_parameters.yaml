@@ -105,12 +105,40 @@ tabs:
                     if:
                       source_type: 'equals fixed_value'
   fallbacks:
-    display: 'Generic lists'
+    display: 'Cascade lists'
     sections:
+      -
+        display: Channel
+        instructions: 'The first step of the cascade. Each option in this list names the source list it leads to.'
+        fields:
+          -
+            handle: channel_list
+            field:
+              type: entries
+              display: 'Channel list'
+              instructions: 'The list of marketing channels a request starts from.'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
       -
         display: 'Generic list for each step'
         instructions: 'Used by a step when no choice made so far names a list for it.'
         fields:
+          -
+            handle: fallback_source
+            field:
+              type: entries
+              display: 'Source generic list'
+              collections:
+                - lookup_lists
+              max_items: 1
+              mode: default
+              create: false
+              localizable: false
+              width: 50
           -
             handle: fallback_source_platform
             field:
