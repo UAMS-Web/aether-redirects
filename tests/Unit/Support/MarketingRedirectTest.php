@@ -127,3 +127,30 @@ it('offers exactly the 301 and 302 responses to the host application', function 
     // The host validates the utility's `response` field against this list.
     expect(MarketingRedirect::ALLOWED_RESPONSES)->toBe(['301', '302']);
 });
+
+it('renders the data of a redirect domain entry, without the row id and type', function (): void {
+    $redirect = MarketingRedirect::fromInput([
+        'source' => 'flu/',
+        'destination' => 'https://www.uams.edu/flu',
+        'host' => 'UAMS.info.',
+        'valid_until' => '2026-01-31',
+    ], 'user-1');
+
+    $data = $redirect->toDomainData('uams.info');
+
+    expect($redirect->host)->toBe('uams.info')
+        ->and($data)->not->toHaveKeys(['id', 'type'])
+        ->and($data['host'])->toBe('uams.info')
+        ->and($data['whole_domain'])->toBeFalse()
+        ->and($data['status'])->toBe('pending')
+        ->and($data['source'])->toBe('/flu')
+        ->and($data['target_url'])->toBe('https://www.uams.edu/flu')
+        ->and($data['valid_until'])->toBe('2026-01-31')
+        ->and($data['submitted_by'])->toBe('user-1');
+});
+
+it('leaves the host null when none is given or it is not a domain', function (?string $host): void {
+    $redirect = MarketingRedirect::fromInput(['source' => '/x', 'destination' => '/y', 'host' => $host]);
+
+    expect($redirect->host)->toBeNull();
+})->with([[null], [''], ['not a host']]);

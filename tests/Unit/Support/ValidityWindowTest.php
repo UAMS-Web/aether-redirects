@@ -118,3 +118,18 @@ it('an open window overlaps every other window', function (): void {
         ->and($bounded->overlaps($open))->toBeTrue()
         ->and($open->overlaps(new ValidityWindow))->toBeTrue();
 });
+
+it('extends the end of a window by the reuse buffer, so a new rule may start exactly the buffer after the last day', function (): void {
+    $buffered = ValidityWindow::fromDates('2026-01-01', '2026-01-31')->withReuseBuffer(12);
+
+    // 12 weeks after 2026-01-31 is 2026-04-25; the path is reserved through the day before
+    expect($buffered->overlaps(ValidityWindow::fromDates('2026-04-24', null)))->toBeTrue()
+        ->and($buffered->overlaps(ValidityWindow::fromDates('2026-04-25', null)))->toBeFalse()
+        ->and($buffered->from?->toDateString())->toBe('2026-01-01');
+});
+
+it('leaves an open end open when a reuse buffer is added', function (): void {
+    $buffered = ValidityWindow::fromDates('2026-01-01', null)->withReuseBuffer(12);
+
+    expect($buffered->until)->toBeNull();
+});

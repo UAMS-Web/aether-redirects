@@ -9,16 +9,22 @@ use Statamic\Auth\File\User as FileStatamicUser;
 use Statamic\Contracts\Auth\RoleRepository as RoleRepositoryContract;
 use Statamic\CP\Navigation\Nav as Navigation;
 use Statamic\CP\Navigation\NavItem;
+use Statamic\Entries\Collection as StatamicCollection;
+use Statamic\Facades\Blueprint as BlueprintFacade;
 use Statamic\Facades\CP\Nav;
+use Statamic\Facades\Fieldset;
 use Statamic\Facades\GlobalSet;
 use Statamic\Facades\Permission;
 use Statamic\Facades\Role;
 use Statamic\Facades\Site;
+use Statamic\Facades\Stache;
 use Statamic\Facades\User;
 use Statamic\Globals\Variables;
+use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 
@@ -56,6 +62,23 @@ beforeEach(function (): void {
     $vars = $set->makeLocalization($site->handle());
     $vars->data(['redirects' => []]);
     $vars->save();
+
+    // Provide the redirect domains collection the pending count also reads
+    $blueprint = 'collections/redirect_domains/redirect_domain.yaml';
+    File::ensureDirectoryExists(dirname(BlueprintFacade::directory().'/'.$blueprint));
+    File::copy(__DIR__.'/../Fixtures/blueprints/'.$blueprint, BlueprintFacade::directory().'/'.$blueprint);
+
+    File::ensureDirectoryExists(Fieldset::directory());
+    File::copy(__DIR__.'/../Fixtures/fieldsets/uamsweb_common.yaml', Fieldset::directory().'/uamsweb_common.yaml');
+
+    $path = __DIR__.'/../Fixtures/redirect_domains.yaml';
+    $store = Stache::store('collections');
+    Assert::assertInstanceOf(CollectionsStore::class, $store);
+
+    $collection = $store->makeItemFromFile($path, File::get($path));
+    Assert::assertInstanceOf(StatamicCollection::class, $collection);
+
+    $collection->save();
 });
 
 /**
@@ -182,4 +205,26 @@ it('labels the review queue with the pending count only when requests await appr
     'none pending' => [0, 'Review Redirects'],
     'one pending' => [1, 'Review Redirects (1)'],
     'two pending' => [2, 'Review Redirects (2)'],
+]);
+
+it('adds the pending domain requests to the pending count', function (int $global, int $domain, string $label): void {
+    // Store the given number of pending requests on each path
+    for ($i = 0; $i < $global; $i++) {
+        app(MarketingRedirectStore::class)->create(
+            MarketingRedirect::fromInput(['source' => '/pending-'.$i, 'destination' => '/target'])
+        );
+    }
+
+    for ($i = 0; $i < $domain; $i++) {
+        app(RedirectDomainStore::class)->create(
+            MarketingRedirect::fromInput(['source' => '/domain-'.$i, 'destination' => '/target', 'host' => 'uams.info'])
+        );
+    }
+
+    marketingRedirectRegistrationSignIn([MarketingRedirectController::APPROVE_PERMISSION]);
+
+    expect(array_keys(marketingRedirectRegistrationNavItems()))->toContain($label);
+})->with([
+    'domain only' => [0, 2, 'Review Redirects (2)'],
+    'both' => [1, 2, 'Review Redirects (3)'],
 ]);
