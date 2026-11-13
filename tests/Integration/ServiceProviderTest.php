@@ -8,6 +8,7 @@ use Statamic\Statamic;
 use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
+use UAMSWeb\Aether\Redirects\Support\ShortCode;
 use UAMSWeb\Aether\Redirects\Tags\FindRedirectRule;
 
 /**
@@ -74,4 +75,13 @@ it('binds the back-half generator a vanity URL request draws with', function ():
     expect($generator->alphabet)->toBe(BackHalf::ALPHABET)
         ->and($generator->length)->toBe(BackHalf::LENGTH)
         ->and($generator->maxAttempts)->toBe(BackHalf::MAX_ATTEMPTS);
+});
+
+it('binds the short-code generator a go.uams.edu short link draws with', function (): void {
+    $generator = app(ShortCode::GENERATOR);
+    Assert::assertInstanceOf(RandomCode::class, $generator);
+
+    expect($generator->alphabet)->toBe(ShortCode::ALPHABET)
+        ->and($generator->length)->toBe(ShortCode::LENGTH)
+        ->and($generator->maxAttempts)->toBe(ShortCode::MAX_ATTEMPTS);
 });

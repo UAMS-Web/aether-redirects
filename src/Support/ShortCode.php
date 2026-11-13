@@ -24,6 +24,12 @@ final class ShortCode
     public const string HOST = 'go.uams.edu';
 
     /**
+     * The container binding that resolves the generator a short link draws with,
+     * so a host application or a test can replace it.
+     */
+    public const string GENERATOR = 'aether-redirects.short-code-generator';
+
+    /**
      * The characters a code may contain: `a`-`z` without `i`, `l` and `o`, and `2`-`9`.
      */
     public const string ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -52,6 +58,17 @@ final class ShortCode
     public static function generator(): RandomCode
     {
         return new RandomCode(self::ALPHABET, self::LENGTH, self::MAX_ATTEMPTS);
+    }
+
+    /**
+     * Whether a value is in the short-code format: exactly the configured length, from the alphabet.
+     *
+     * @param  string  $value  The value, without a leading slash
+     * @return bool True for a well-formed code
+     */
+    public static function isCode(string $value): bool
+    {
+        return \strlen($value) === self::LENGTH && strspn($value, self::ALPHABET) === self::LENGTH;
     }
 
     /**

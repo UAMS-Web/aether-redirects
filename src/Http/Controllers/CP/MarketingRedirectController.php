@@ -7,6 +7,7 @@ namespace UAMSWeb\Aether\Redirects\Http\Controllers\CP;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -19,11 +20,13 @@ use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
+use UAMSWeb\Aether\Redirects\Services\TrustedDestinationReader;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
+use UAMSWeb\Aether\Redirects\Support\ShortCode;
 
 /**
  * Drives the marketing-redirect creation utility (UAMS-Web/uams-statamic-archive#1355).
@@ -47,6 +50,13 @@ use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
  * (UAMS-Web/aether-redirects#15): 7 base-62 characters never issued on that
  * domain in any case. Approval checks it again, so two pending requests whose
  * back-halves differ only in case cannot both go live.
+ *
+ * A short link is a request on `go.uams.edu` whose source is a generated
+ * 6-character code (UAMS-Web/aether-redirects#84), behind its own `create short
+ * links` permission. `shortCode` draws a code for the screen, which the creator
+ * can draw again before saving. A code is never issued twice on the domain, and
+ * one whose destination is on a trusted host is saved approved; any other waits
+ * for an approver.
  */
 class MarketingRedirectController extends CpController
 {
@@ -61,19 +71,27 @@ class MarketingRedirectController extends CpController
     public const string APPROVE_PERMISSION = 'approve marketing redirects';
 
     /**
+     * The permission required to make a `go.uams.edu` short link (UAMS-Web/aether-redirects#84).
+     */
+    public const string SHORT_LINK_PERMISSION = 'create short links';
+
+    /**
      * Render the marketing-redirect creation screen.
      */
     public function create(): InertiaResponse
     {
-        // Only staff granted the redirect permission may open the utility.
-        $this->authorize(self::PERMISSION);
+        // Only staff who can request redirects or make short links may open the utility.
+        abort_unless(Gate::any([self::PERMISSION, self::SHORT_LINK_PERMISSION]), 403);
 
-        // Hand the Vue screen its POST target, the redirect-type options and the
-        // domains a request can be made for.
+        // Hand the Vue screen its POST targets, the redirect-type options, the
+        // domains a request can be made for and what this user may make.
         return Inertia::render('aether-redirects::MarketingRedirectCreate', [
             'storeUrl' => cp_route('marketing-redirects.store'),
+            'shortCodeUrl' => cp_route('marketing-redirects.short-code'),
             'hostOptions' => $this->hostOptions(),
             'canApprove' => $this->canApprove(),
+            'canCreateRedirects' => Gate::allows(self::PERMISSION),
+            'shortLinkHost' => Gate::allows(self::SHORT_LINK_PERMISSION) && ! $this->shortLinkHostError() instanceof JsonResponse ? ShortCode::HOST : null,
             'generatedHosts' => RedirectHosts::vanity(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
@@ -89,9 +107,15 @@ class MarketingRedirectController extends CpController
         Request $request,
         MarketingRedirectStore $globalStore,
         RedirectDomainStore $domainStore,
-        RedirectCollisionDetector $detector
+        RedirectCollisionDetector $detector,
+        TrustedDestinationReader $trusted
     ): JsonResponse {
-        // Gate the write behind the same permission as the screen.
+        // A short link has its own permission and rules (UAMS-Web/aether-redirects#84).
+        if ($request->boolean('short_link')) {
+            return $this->storeShortLink($request, $domainStore, $trusted);
+        }
+
+        // Gate the write behind the redirect permission.
         $this->authorize(self::PERMISSION);
 
         // Validate the raw submission before building the typed model.
@@ -171,6 +195,141 @@ class MarketingRedirectController extends CpController
             'message' => $this->submittedMessage($redirect),
             'redirect' => $row,
         ], 201);
+    }
+
+    /**
+     * Draw a short-link code the screen offers before saving (UAMS-Web/aether-redirects#84).
+     *
+     * The code is free when drawn; saving checks it again, since another short
+     * link may take it in between.
+     */
+    public function shortCode(RedirectDomainStore $domainStore): JsonResponse
+    {
+        $this->authorize(self::SHORT_LINK_PERMISSION);
+
+        $hostError = $this->shortLinkHostError();
+
+        if ($hostError instanceof JsonResponse) {
+            return $hostError;
+        }
+
+        try {
+            $code = ShortCode::generate($this->rowsOnHost($domainStore->all(), ShortCode::HOST), $this->shortCodeGenerator());
+        } catch (CodeGenerationException $codeGenerationException) {
+            return $this->unprocessable('source', $codeGenerationException->getMessage());
+        }
+
+        return response()->json(['code' => $code]);
+    }
+
+    /**
+     * Validate and save a short link on `go.uams.edu` (UAMS-Web/aether-redirects#84).
+     *
+     * The source is a code the screen drew, or blank to draw one here. A code is
+     * refused when it is not in the short-code format or when any rule or request on
+     * the domain has issued it, whatever its validity window. The link is saved
+     * approved when its destination is on a trusted host, and pending otherwise.
+     *
+     * @param  Request  $request  The incoming create request
+     * @param  RedirectDomainStore  $domainStore  The store of the domain's rules
+     * @param  TrustedDestinationReader  $trusted  The reader of the trusted hosts
+     * @return JsonResponse The saved link, or an error
+     */
+    private function storeShortLink(Request $request, RedirectDomainStore $domainStore, TrustedDestinationReader $trusted): JsonResponse
+    {
+        $this->authorize(self::SHORT_LINK_PERMISSION);
+
+        // The same fields as any request, with the source optional: a blank one is drawn here.
+        $validated = $this->validateInput($request, sourceOptional: true);
+
+        // A short link is made on its one domain; naming any other is an error, never a silent move.
+        $submittedHost = RedirectHosts::normalize($validated['host']);
+
+        if ($submittedHost !== null && $submittedHost !== ShortCode::HOST) {
+            return $this->unprocessable('host', __('A short link is made on :host.', ['host' => ShortCode::HOST]));
+        }
+
+        $hostError = $this->shortLinkHostError();
+
+        if ($hostError instanceof JsonResponse) {
+            return $hostError;
+        }
+
+        // The '' stands in only for the code, which replaces it below.
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
+        $redirect = MarketingRedirect::fromInput([...$validated, 'source' => '', 'host' => ShortCode::HOST], $this->currentUserId());
+
+        if ($this->windowIsInverted($redirect)) {
+            return $this->unprocessable(
+                'valid_until',
+                __('The "valid until" date must be on or after the "valid from" date.')
+            );
+        }
+
+        // A typed code must be in the format and never issued; a blank one is drawn here.
+        $rows = $this->rowsOnHost($domainStore->all(), ShortCode::HOST);
+        $code = ltrim(trim($validated['source'] ?? ''), '/');
+
+        if ($code === '') {
+            try {
+                $code = ShortCode::generate($rows, $this->shortCodeGenerator());
+            } catch (CodeGenerationException $exception) {
+                return $this->unprocessable('source', $exception->getMessage());
+            }
+        } elseif (! ShortCode::isCode($code)) {
+            return $this->unprocessable('source', __("A short link's path is a generated code. Use Generate code to get one."));
+        } elseif (BackHalf::isIssued($code, $rows)) {
+            return $this->unprocessable('source', __('The code :code is already in use on :host. Generate another.', ['code' => $code, 'host' => ShortCode::HOST]));
+        }
+
+        // A destination on a trusted host goes live now; any other waits for an approver.
+        $approved = $trusted->trusted()->allows($redirect->destination);
+        $redirect = $redirect->withShortCode($code, $approved);
+        $row = $domainStore->create($redirect);
+        $url = ShortCode::HOST.$redirect->source;
+
+        return response()->json([
+            'saved' => true,
+            'message' => $approved
+                ? __('Short link created. It serves at :url.', ['url' => $url])
+                : __('Short link submitted for review, because its destination is not on a UAMS domain. It serves at :url once an approver approves it.', ['url' => $url]),
+            'redirect' => $row,
+        ], 201);
+    }
+
+    /**
+     * The error for a short link when its domain is not in the domain list.
+     *
+     * @return JsonResponse|null A 422, or null when the domain is listed
+     */
+    private function shortLinkHostError(): ?JsonResponse
+    {
+        // Both sides are normalized host strings, which compare the same loosely or strictly
+        // @pest-mutate-ignore:TrueToFalse
+        if (\in_array(ShortCode::HOST, $this->hostOptions(), true)) {
+            return null;
+        }
+
+        return $this->unprocessable('host', __(':host is not a redirect domain.', ['host' => ShortCode::HOST]));
+    }
+
+    /**
+     * The generator a short link draws with.
+     *
+     * @return RandomCode The bound generator
+     *
+     * @throws LogicException When a host rebinds it to anything else
+     */
+    private function shortCodeGenerator(): RandomCode
+    {
+        // The provider binds the generator; a host that rebinds it to anything else has misconfigured it.
+        $generator = app(ShortCode::GENERATOR);
+
+        if (! $generator instanceof RandomCode) {
+            throw new LogicException(sprintf('The "%s" binding must resolve to a %s.', ShortCode::GENERATOR, RandomCode::class));
+        }
+
+        return $generator;
     }
 
     /**
@@ -267,19 +426,21 @@ class MarketingRedirectController extends CpController
      * Validate the create request.
      *
      * A source may be left out only on a vanity domain, where it asks for a
-     * generated back-half (UAMS-Web/aether-redirects#15).
+     * generated back-half (UAMS-Web/aether-redirects#15), or for a short link,
+     * where it asks for a generated code (UAMS-Web/aether-redirects#84).
      *
      * @param  Request  $request  The incoming create request
+     * @param  bool  $sourceOptional  Whether a blank source is allowed whatever the domain
      * @return array{source: string|null, destination: string, response: string, valid_from: string|null, valid_until: string|null, requester: string|null, notes: string|null, host: string|null}
      */
-    private function validateInput(Request $request): array
+    private function validateInput(Request $request, bool $sourceOptional = false): array
     {
         $host = $request->input('host');
         $vanity = RedirectHosts::isVanity(RedirectHosts::normalize(\is_string($host) ? $host : null));
 
         /** @var array{source?: string|null, destination: string, response: string, valid_from?: string|null, valid_until?: string|null, requester?: string|null, notes?: string|null, host?: string|null} $validated */
         $validated = $request->validate([
-            'source' => [Rule::requiredIf(! $vanity), 'nullable', 'string', 'max:2048'],
+            'source' => [Rule::requiredIf(! $vanity && ! $sourceOptional), 'nullable', 'string', 'max:2048'],
             'destination' => ['required', 'string', 'max:2048'],
             'response' => ['required', 'string', Rule::in(MarketingRedirect::ALLOWED_RESPONSES)],
             'valid_from' => ['nullable', 'date'],
