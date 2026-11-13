@@ -44,7 +44,7 @@ class TaggedUrlLookupReader
         // Each step's generic list, where the site names one.
         $generic = [];
 
-        foreach (TaggedUrlLookup::STEPS as $step) {
+        foreach (TaggedUrlLookup::steps() as $step) {
             $list = TaggedUrlParameter::firstId($variables?->get('fallback_'.$step));
 
             if ($list !== null) {
@@ -83,7 +83,7 @@ class TaggedUrlLookupReader
         foreach ($this->entries(TaggedUrlLookup::OPTIONS_COLLECTION) as $option) {
             $pointers = [];
 
-            foreach (TaggedUrlLookup::STEPS as $step) {
+            foreach (TaggedUrlLookup::steps() as $step) {
                 $pointer = TaggedUrlParameter::firstId($option->get($step));
 
                 if ($pointer !== null) {

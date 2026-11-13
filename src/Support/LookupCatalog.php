@@ -89,7 +89,7 @@ final readonly class LookupCatalog
     /**
      * The list a cascade step offers, given the choices made so far.
      *
-     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::STEPS}
+     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::steps()}
      * @param  list<LookupOption>  $choices  The options chosen so far, shallowest first
      * @param  string|null  $genericList  The step's generic list id, or null when the site names none
      * @return string|null The list id, or null when neither a choice nor the generic list names one

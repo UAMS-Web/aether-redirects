@@ -36,7 +36,7 @@ final readonly class LookupOption
     /**
      * The list this option names for a cascade step, or null when it names none.
      *
-     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::STEPS}
+     * @param  string  $step  A cascade step, one of {@see TaggedUrlLookup::steps()}
      * @return string|null The downstream list id
      */
     public function pointerFor(string $step): ?string
