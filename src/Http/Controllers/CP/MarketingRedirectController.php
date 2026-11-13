@@ -1029,12 +1029,9 @@ class MarketingRedirectController extends CpController
      */
     private function canApprove(): bool
     {
-        $user = User::current();
-
-        // Every caller runs behind the CP auth middleware, so there is always a current user and the null-safe
-        // calls never short-circuit; a super user holds every permission without listing it
-        // @pest-mutate-ignore:RemoveNullSafeOperator
-        return $user?->isSuper() === true || $user?->hasPermission(self::APPROVE_PERMISSION) === true;
+        // The gate resolves the current user itself, answers false for none, and passes a super user,
+        // which needs no null-safe call on the user (UAMS-Web/aether-redirects#95)
+        return Gate::allows(self::APPROVE_PERMISSION);
     }
 
     /**
