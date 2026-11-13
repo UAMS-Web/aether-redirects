@@ -237,6 +237,22 @@ tabs:
                             if:
                               status: 'equals rejected'
                         -
+                          handle: creative_services
+                          field:
+                            type: toggle
+                            display: 'Involves Creative Services'
+                            instructions: 'Set by the Marketing Redirects utility.'
+                            visibility: read_only
+                            localizable: false
+                        -
+                          handle: job_number
+                          field:
+                            type: text
+                            display: 'Creative Services Job Number'
+                            instructions: 'Set by the utility when the request involves Creative Services. The approver confirms it before approving.'
+                            visibility: read_only
+                            localizable: false
+                        -
                           handle: submitted_by
                           field:
                             type: users

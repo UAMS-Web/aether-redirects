@@ -25,6 +25,10 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * new one (UAMS-Web/aether-redirects#84). Typing a source by hand makes the
  * request an ordinary redirect again; a user who can only make short links
  * cannot type one.
+ *
+ * Every request answers whether it involves Creative Services, and a "yes" asks for
+ * the job number (UAMS-Web/aether-redirects#25). The answer is made on purpose, with
+ * no default, and the server refuses a vanity domain request that answers no.
  */
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
@@ -43,6 +47,8 @@ const props = defineProps({
     canApprove: { type: Boolean, default: false },
     // Domains where a blank source asks the server to generate a back-half
     generatedHosts: { type: Array, default: () => [] },
+    // The job number format in words, from the add-on's `creative_services` setting
+    jobNumberDescription: { type: String, default: '' },
 });
 
 const instance = getCurrentInstance().proxy;
@@ -62,6 +68,8 @@ const blankForm = () => ({
     valid_until: '',
     requester: '',
     notes: '',
+    creative_services: '',
+    job_number: '',
 });
 
 const form = ref(blankForm());
@@ -272,6 +280,29 @@ async function submit() {
                         <p class="mt-1 text-xs text-gray-500">{{ __('Optional. Inclusive. Leave blank for no end date.') }}</p>
                         <p v-if="errorFor('valid_until')" class="mt-1 text-xs text-red-600" v-text="errorFor('valid_until')" />
                     </div>
+                </div>
+
+                <fieldset>
+                    <legend class="mb-1 block text-sm font-medium">{{ __('Does this request involve Creative Services?') }}</legend>
+                    <label class="mr-4 inline-flex items-center gap-2 text-sm">
+                        <input v-model="form.creative_services" type="radio" name="creative_services" value="yes" />
+                        {{ __('Yes') }}
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input v-model="form.creative_services" type="radio" name="creative_services" value="no" />
+                        {{ __('No') }}
+                    </label>
+                    <p v-if="errorFor('creative_services')" class="mt-1 text-xs text-red-600" v-text="errorFor('creative_services')" />
+                </fieldset>
+
+                <div v-if="form.creative_services === 'yes'">
+                    <label class="mb-1 block text-sm font-medium" for="mr-job-number">{{ __('Creative Services job number') }}</label>
+                    <input id="mr-job-number" v-model="form.job_number" type="text" :class="inputClass" autocomplete="off" />
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('Required. The approver confirms the number before approving.') }}
+                        <span v-if="jobNumberDescription">{{ __('Format:') }} {{ jobNumberDescription }}.</span>
+                    </p>
+                    <p v-if="errorFor('job_number')" class="mt-1 text-xs text-red-600" v-text="errorFor('job_number')" />
                 </div>
 
                 <div>

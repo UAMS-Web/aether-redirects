@@ -65,6 +65,7 @@ function slSubmit(FileStatamicUser $user, array $overrides = []): TestResponse
         'short_link' => true,
         'destination' => 'https://www.uams.edu/clinics/flu',
         'response' => '301',
+        'creative_services' => 'no',
         ...$overrides,
     ]);
 }
@@ -365,4 +366,26 @@ it('refuses to draw with a generator binding that is not a code generator', func
 
     expect(fn (): TestResponse => slDraw(slMaker()))
         ->toThrow(LogicException::class, 'The "aether-redirects.short-code-generator" binding must resolve to a '.RandomCode::class.'.');
+});
+
+it('asks a short link request the Creative Services question too, and accepts either answer', function (): void {
+    slSubmit(slMaker(), ['creative_services' => null])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('creative_services');
+
+    slSubmit(slMaker(), ['creative_services' => 'no'])->assertCreated();
+
+    $response = slSubmit(slMaker(), ['creative_services' => 'yes', 'job_number' => '13579']);
+
+    $response->assertCreated();
+    expect($response->json('redirect.creative_services'))->toBeTrue()
+        ->and($response->json('redirect.job_number'))->toBe('13579');
+});
+
+it('does not apply the vanity URL refusal to a short link that names a vanity domain', function (): void {
+    $response = slSubmit(slMaker(), ['host' => 'uams.info', 'creative_services' => 'no']);
+
+    $response->assertUnprocessable();
+    expect($response->json('errors.creative_services'))->toBeNull()
+        ->and($response->json('errors.host.0'))->toBe('A short link is made on go.uams.edu.');
 });

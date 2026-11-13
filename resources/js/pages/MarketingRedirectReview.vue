@@ -14,7 +14,7 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  */
 const props = defineProps({
     // Pending requests: [{ id, host, source, destination, response, requester, notes,
-    // valid_from, valid_until, can_review, approve_url, reject_url }]
+    // valid_from, valid_until, creative_services, job_number, can_review, approve_url, reject_url }]
     redirects: { type: Array, default: () => [] },
 });
 
@@ -144,6 +144,11 @@ async function confirmReject(row) {
                                 <p class="mt-1 text-xs text-gray-500">
                                     {{ __('Type') }}: {{ row.response }}
                                     <span v-if="row.requester"> · {{ __('Requester') }}: {{ row.requester }}</span>
+                                    <span class="font-medium">
+                                        · {{ __('Creative Services') }}:
+                                        <template v-if="row.creative_services">{{ __('Yes') }}, {{ __('job number') }} {{ row.job_number }}</template>
+                                        <template v-else>{{ __('No') }}</template>
+                                    </span>
                                     <span v-if="row.valid_from || row.valid_until">
                                         · {{ __('Window') }}: {{ row.valid_from || '…' }} – {{ row.valid_until || '…' }}
                                     </span>
