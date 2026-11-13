@@ -205,12 +205,20 @@ it('scopes collisions to the domain', function (): void {
     // The same path on another domain is a different rule
     mrdSubmit(mrdCreator(), ['host' => 'uams.health', 'source' => '/shared', 'destination' => 'https://uamshealth.com/'])->assertCreated();
 
-    // The same path on the same domain collides, and the message names the conflicting rule
+    // The same path on the same domain is refused, and the message names the rule that failed
     $response = mrdSubmit(mrdCreator(), ['host' => 'uams.info', 'source' => '/Shared']);
 
     $response->assertStatus(422);
 
-    expect($response->json('errors.source.0'))->toContain('uams.info/shared');
+    expect($response->json('errors.source.0'))->toBe('The back-half "Shared" is already in use on this domain, in any case.');
+
+    // A domain with no typed-back-half rules reports the colliding rule by its path
+    mrdSubmit(mrdCreator(), ['host' => 'go.uams.edu', 'source' => '/shared', 'destination' => 'https://example.org/'])->assertCreated();
+    $conflict = mrdSubmit(mrdCreator(), ['host' => 'go.uams.edu', 'source' => '/Shared', 'destination' => 'https://example.org/']);
+
+    $conflict->assertStatus(422);
+
+    expect($conflict->json('errors.source.0'))->toContain('go.uams.edu/shared');
 });
 
 it('does not collide with a main-site redirect on the same path', function (): void {
@@ -266,7 +274,7 @@ it('hands the create screen the domains a request can be made for', function ():
 });
 
 it('creates a published entry on the default site that the collection titles by host and path', function (): void {
-    $response = mrdSubmit(mrdCreator(), ['host' => 'uams.info', 'source' => '/Flu Shot']);
+    $response = mrdSubmit(mrdCreator(), ['host' => 'uams.info', 'source' => '/Flu-Shot']);
     $response->assertCreated();
 
     /** @var string $id */
@@ -276,7 +284,7 @@ it('creates a published entry on the default site that the collection titles by 
 
     expect($entry->locale())->toBe('default')
         ->and($entry->published())->toBeTrue()
-        ->and($entry->get('title'))->toBe('uams.info/Flu Shot')
+        ->and($entry->get('title'))->toBe('uams.info/Flu-Shot')
         ->and($response->json('redirect.id'))->toBe($entry->id());
 });
 
