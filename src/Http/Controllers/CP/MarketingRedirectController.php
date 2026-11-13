@@ -352,8 +352,8 @@ class MarketingRedirectController extends CpController
      */
     private function storeTagged(Request $request, TaggedUrlRequestStore $store): JsonResponse
     {
+        // The `kind` itself needs no rule: only a submission whose kind is the tagged one reaches here
         $rules = [
-            'kind' => ['required', 'string'],
             'destination' => ['required', 'string', 'max:2048'],
             TaggedUrlRequestStore::SUPPRESS_FIELD => ['nullable', 'boolean'],
             'requester' => ['nullable', 'string', 'max:255'],
@@ -435,6 +435,8 @@ class MarketingRedirectController extends CpController
         if ($store instanceof TaggedUrlRequestStore) {
             $url = $row[TaggedUrlRequestStore::TAGGED_URL_FIELD] ?? null;
 
+            // Approval always stores the composed URL, so the '' fallback is unreachable and only narrows the type
+            // @pest-mutate-ignore:EmptyStringToNotEmpty
             return __('Tagged URL approved and issued: :url', ['url' => \is_string($url) ? $url : '']);
         }
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Assert;
 use Statamic\Entries\Collection as StatamicCollection;
 use Statamic\Entries\Entry as StatamicEntry;
@@ -147,4 +148,40 @@ it('names every field the store writes in the reference blueprint the host copie
     sort($handles);
 
     expect($handles)->toBe($written);
+});
+
+it('lists the pending requests as a list, ordered by destination', function (): void {
+    turStoreCollection();
+
+    $first = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/a'), null, null, null);
+    $second = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/b'), null, null, null);
+    $firstId = $first['id'];
+    Assert::assertIsString($firstId);
+    turStore()->reject($firstId, 'approver', 'No');
+
+    expect(array_column(turStore()->all(), 'destination'))->toBe(['https://www.uams.edu/a', 'https://www.uams.edu/b'])
+        ->and(array_keys(turStore()->pending()))->toBe([0])
+        ->and(turStore()->pending()[0]['id'])->toBe($second['id']);
+});
+
+it('writes a review to the entry file, and clears an earlier rejection reason on approval', function (): void {
+    turStoreCollection();
+
+    $row = turStore()->create(new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'flu']), null, null, null);
+    $id = $row['id'];
+    Assert::assertIsString($id);
+
+    turStore()->reject($id, 'approver', 'Not yet');
+    $approved = turStore()->approve($id, 'approver');
+
+    expect($approved['rejection_reason'] ?? null)->toBeNull()
+        ->and($approved['status'] ?? null)->toBe('approved');
+
+    $entry = Entry::find($id);
+    Assert::assertInstanceOf(StatamicEntry::class, $entry);
+    $file = File::get($entry->path());
+
+    expect($file)->toContain('status: approved')
+        ->and($file)->toContain('tagged_url:')
+        ->and($file)->not->toContain('Not yet');
 });

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../../../../Support/MarketingRedirectDomainHelpers.php';
 
+use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Assert;
@@ -17,6 +19,7 @@ use Statamic\Facades\GlobalSet;
 use Statamic\Facades\Site;
 use Statamic\Globals\GlobalSet as StatamicGlobalSet;
 use Statamic\Globals\Variables;
+use Statamic\Http\Middleware\CP\TrimStrings as CpTrimStrings;
 use Statamic\Sites\Site as StatamicSite;
 use Symfony\Component\HttpFoundation\Response;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
@@ -139,11 +142,13 @@ it('saves a request with the tagged URL part only, pending and with no tagged UR
     ]);
 
     $response->assertCreated()
+        ->assertJsonPath('saved', true)
         ->assertJsonPath('message', 'Tagged URL request submitted for review. The tagged URL is issued once an approver approves it.');
 
     $id = turId($response);
 
     expect(turField($id, 'status'))->toBe('pending')
+        ->and(turField($id, 'title'))->toBe('https://www.uams.edu/flu')
         ->and(turField($id, 'destination'))->toBe('https://www.uams.edu/flu')
         ->and(turField($id, 'utm_campaign'))->toBe('flu-2026')
         ->and(turField($id, 'utm_id'))->toBe('42')
@@ -180,6 +185,10 @@ it('requires a destination, and refuses fields that are too long or not text', f
         ->assertJsonValidationErrors([$field]);
 })->with([
     'no destination' => [['destination' => ''], 'destination'],
+    'the destination left out' => [['destination' => null, 'kind' => MarketingRedirectController::KIND_TAGGED], 'destination'],
+    'a destination that is not text' => [['destination' => ['https://www.uams.edu/']], 'destination'],
+    'a requester that is not text' => [['requester' => ['Comms']], 'requester'],
+    'notes that are not text' => [['notes' => ['Fall push']], 'notes'],
     'a long destination' => [['destination' => 'https://www.uams.edu/'.str_repeat('a', 2048)], 'destination'],
     'a long request field' => [['utm_campaign' => str_repeat('a', 256)], 'utm_campaign'],
     'a request field that is not text' => [['utm_id' => ['x']], 'utm_id'],
@@ -187,6 +196,53 @@ it('requires a destination, and refuses fields that are too long or not text', f
     'a long requester' => [['requester' => str_repeat('a', 256)], 'requester'],
     'long notes' => [['notes' => str_repeat('a', 2049)], 'notes'],
 ]);
+
+it('submits with the destination key left out entirely', function (): void {
+    $test = mrdTest();
+    $test->actingAs(mrdCreator());
+
+    $test->postJson(mrdRoute('marketing-redirects.store'), ['kind' => MarketingRedirectController::KIND_TAGGED])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['destination']);
+});
+
+it('accepts an empty value for each optional field', function (): void {
+    $id = turId(turSubmit(mrdCreator(), [
+        'utm_campaign' => null,
+        TaggedUrlRequestStore::SUPPRESS_FIELD => null,
+        'requester' => null,
+        'notes' => null,
+    ])->assertCreated());
+
+    expect(turField($id, 'utm_campaign'))->toBeNull()
+        ->and(turField($id, TaggedUrlRequestStore::SUPPRESS_FIELD))->toBeFalse()
+        ->and(turField($id, 'requester'))->toBeNull()
+        ->and(turField($id, 'notes'))->toBeNull();
+});
+
+it('stores a suppress flag sent as a number as a boolean', function (): void {
+    $id = turId(turSubmit(mrdCreator(), [TaggedUrlRequestStore::SUPPRESS_FIELD => 1])->assertCreated());
+
+    expect(turField($id, TaggedUrlRequestStore::SUPPRESS_FIELD))->toBeTrue();
+});
+
+it('trims every value itself, without the middleware that trims them', function (): void {
+    test()->withoutMiddleware([TrimStrings::class, CpTrimStrings::class, ConvertEmptyStringsToNull::class]);
+
+    $id = turId(turSubmit(mrdCreator(), [
+        'destination' => '  https://www.uams.edu/flu  ',
+        'utm_campaign' => '  flu-2026  ',
+        'utm_id' => '   ',
+        'requester' => '  Comms  ',
+        'notes' => '   ',
+    ])->assertCreated());
+
+    expect(turField($id, 'destination'))->toBe('https://www.uams.edu/flu')
+        ->and(turField($id, 'utm_campaign'))->toBe('flu-2026')
+        ->and(turField($id, 'utm_id'))->toBeNull()
+        ->and(turField($id, 'requester'))->toBe('Comms')
+        ->and(turField($id, 'notes'))->toBeNull();
+});
 
 it('accepts the longest allowed values', function (): void {
     turSubmit(mrdCreator(), [

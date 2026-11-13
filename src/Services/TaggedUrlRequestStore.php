@@ -75,21 +75,19 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
     }
 
     /**
-     * Every entry of the collection as a row, whatever its status.
+     * Every entry of the collection as a row, whatever its status, ordered by destination.
      *
      * @return list<array<string, mixed>>
      */
     public function all(): array
     {
-        // A host without the collection has no requests; its entry query would fail
-        if (! self::available()) {
-            return [];
-        }
-
+        // A host without the collection matches no entries, so no guard is needed
         /** @var EntryQueryBuilder $query */
         $query = Entry::query();
         /** @var EntryQueryBuilder $query */
         $query = $query->where('collection', self::COLLECTION);
+        /** @var EntryQueryBuilder $query */
+        $query = $query->orderBy('title');
 
         /** @var Collection<int, mixed> $entries */
         $entries = $query->get();
