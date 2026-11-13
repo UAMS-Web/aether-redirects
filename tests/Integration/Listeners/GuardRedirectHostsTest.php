@@ -239,7 +239,20 @@ it('trusts a new domain as soon as its record is published, with no deploy', fun
 });
 
 it('ignores a saving event that does not carry an entry', function (): void {
-    $event = new EntrySaving(new stdClass);
+    // A stub that counts how often the guard asks it for a collection, which only an entry is asked
+    $stub = new class
+    {
+        public int $asked = 0;
 
-    expect(fn () => (new GuardRedirectHosts)->handle($event))->not->toThrow(Throwable::class);
+        public function collectionHandle(): string
+        {
+            $this->asked++;
+
+            return 'unrelated';
+        }
+    };
+
+    (new GuardRedirectHosts)->handle(new EntrySaving($stub));
+
+    expect($stub->asked)->toBe(0);
 });
