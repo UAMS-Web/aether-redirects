@@ -178,6 +178,24 @@ it('shows a requester the creation utility, linked and iconed, and not the revie
         ->and($items['Marketing Redirects']->icon())->toContain('hyperlink');
 });
 
+it('registers the tagged URL permission with a label and a description', function (): void {
+    $permission = Permission::get(MarketingRedirectController::TAGGED_PERMISSION);
+
+    expect(MarketingRedirectController::TAGGED_PERMISSION)->toBe('request tagged urls')
+        ->and($permission)->not->toBeNull()
+        ->and($permission->label())->toBe('Request tagged URLs')
+        ->and($permission->description())->toContain('tagged URL');
+});
+
+it('shows the creation utility to a user who can request only tagged URLs', function (): void {
+    marketingRedirectRegistrationSignIn([MarketingRedirectController::TAGGED_PERMISSION]);
+
+    $items = marketingRedirectRegistrationNavItems();
+
+    expect($items)->toHaveKey('Marketing Redirects')
+        ->and($items)->not->toHaveKey('Review Redirects');
+});
+
 it('shows an approver the review queue, linked and iconed, and not the creation utility', function (): void {
     marketingRedirectRegistrationSignIn([MarketingRedirectController::APPROVE_PERMISSION]);
 

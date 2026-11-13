@@ -63,9 +63,12 @@ const __ = (key) => instance.__(key);
 // Whether the user can make nothing but short links, so every request is one.
 const shortLinksOnly = computed(() => !props.canCreateRedirects && props.shortLinkHost !== null);
 
+// Whether the user may request nothing but tagged URLs, so every request is one.
+const taggedUserOnly = computed(() => !props.canCreateRedirects && props.shortLinkHost === null);
+
 // A blank submission, reused to reset the form after a successful create.
 const blankForm = () => ({
-    kind: 'redirect',
+    kind: taggedUserOnly.value ? 'tagged' : 'redirect',
     host: shortLinksOnly.value ? props.shortLinkHost : '',
     short_link: shortLinksOnly.value,
     source: '',
@@ -230,7 +233,7 @@ async function submit() {
                     v-text="successMessage"
                 />
 
-                <div v-if="taggedAvailable">
+                <div v-if="taggedAvailable && !taggedUserOnly">
                     <span class="mb-1 block text-sm font-medium">{{ __('Request') }}</span>
                     <div class="flex gap-4 text-sm">
                         <label class="flex items-center gap-2">

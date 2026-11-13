@@ -76,6 +76,14 @@ class MarketingRedirectController extends CpController
     public const string PERMISSION = 'create marketing redirects';
 
     /**
+     * The permission required to request a tagged URL alone (UAMS-Web/aether-redirects#11).
+     *
+     * It is the narrowest request level. Whoever holds `PERMISSION` may request a
+     * tagged URL too, without the site granting this one as well.
+     */
+    public const string TAGGED_PERMISSION = 'request tagged urls';
+
+    /**
      * The permission required to approve or reject a redirect request (UAMS-Web/uams-statamic-archive#1357).
      */
     public const string APPROVE_PERMISSION = 'approve marketing redirects';
@@ -95,8 +103,8 @@ class MarketingRedirectController extends CpController
      */
     public function create(): InertiaResponse
     {
-        // Only staff who can request redirects or make short links may open the utility.
-        abort_unless(Gate::any([self::PERMISSION, self::SHORT_LINK_PERMISSION]), 403);
+        // Only staff who can request redirects or tagged URLs, or make short links, may open the utility.
+        abort_unless(Gate::any([self::PERMISSION, self::TAGGED_PERMISSION, self::SHORT_LINK_PERMISSION]), 403);
 
         // Hand the Vue screen its POST targets, the redirect-type options, the
         // domains a request can be made for and what this user may make.
@@ -108,8 +116,8 @@ class MarketingRedirectController extends CpController
             'canCreateRedirects' => Gate::allows(self::PERMISSION),
             'shortLinkHost' => Gate::allows(self::SHORT_LINK_PERMISSION) && ! $this->shortLinkHostError() instanceof JsonResponse ? ShortCode::HOST : null,
             'generatedHosts' => RedirectHosts::vanity(),
-            // A tagged-only request is a redirect request, so it needs the redirect permission (UAMS-Web/aether-redirects#18)
-            'taggedAvailable' => Gate::allows(self::PERMISSION) && TaggedUrlRequestStore::available(),
+            // A tagged-only request needs the tagged URL permission, which the redirect permission includes (UAMS-Web/aether-redirects#11)
+            'taggedAvailable' => $this->canRequestTagged() && TaggedUrlRequestStore::available(),
             'jobNumberDescription' => CreativeServices::description(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
@@ -134,13 +142,16 @@ class MarketingRedirectController extends CpController
             return $this->storeShortLink($request, $domainStore, $trusted);
         }
 
-        // Gate the write behind the redirect permission.
-        $this->authorize(self::PERMISSION);
-
-        // A request for a tagged URL alone has none of the vanity fields (UAMS-Web/aether-redirects#18).
+        // A request for a tagged URL alone has none of the vanity fields (UAMS-Web/aether-redirects#18),
+        // and the tagged URL permission is enough to make one (UAMS-Web/aether-redirects#11).
         if ($request->input('kind') === self::KIND_TAGGED) {
+            abort_unless($this->canRequestTagged(), 403);
+
             return $this->storeTagged($request, $taggedStore);
         }
+
+        // Gate the write behind the redirect permission.
+        $this->authorize(self::PERMISSION);
 
         // Validate the raw submission before building the typed model.
         $validated = $this->validateInput($request);
@@ -560,6 +571,17 @@ class MarketingRedirectController extends CpController
 
         // Only a fully-bounded window can be inverted.
         return $from instanceof CarbonImmutable && $until instanceof CarbonImmutable && $from->gt($until);
+    }
+
+    /**
+     * Whether the signed-in user may request a tagged URL (UAMS-Web/aether-redirects#11).
+     *
+     * The tagged URL permission is the narrowest request level, and the
+     * redirect permission includes it.
+     */
+    private function canRequestTagged(): bool
+    {
+        return Gate::any([self::TAGGED_PERMISSION, self::PERMISSION]);
     }
 
     /**
