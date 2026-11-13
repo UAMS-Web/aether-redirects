@@ -131,3 +131,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Rejected.** A separate format setting per request form: the tagged-only form would drift from the vanity one. Requiring a job number on every request: a request that does not involve Creative Services has none. Defaulting the answer to no: a default makes the answer unintentional, so the form has none and the server requires it.
 
 **Companion.** `UAMS-Web/aether-redirects#25`.
+
+## 2026-11-13: A typed back-half passes four rules, at submission and again at approval (#16)
+
+**Decision.** A back-half the requester types on a vanity domain must be letters, numbers and hyphens, start and end with a letter or number, and have at most 50 characters; must not end in `-QR` in any case; must not be on the `back_half.reserved` setting, which ships empty; and must not be held on that domain, in any case, by a pending request or by an approved redirect that is live, not yet started, or inside the 12-week reuse buffer after its last day. Each refusal names the rule that failed. The same rules run again at approval against the approved rows, so two pending requests for one back-half cannot both go live.
+
+**Why.** Chosen back-halves share one limited namespace with the generated ones on each short domain, and `-QR` names the QR redirect of a vanity URL. A request that was pending when another for the same back-half was approved is the case the second run catches.
+
+**Rejected.** Counting an expired approved redirect as holding the back-half forever: the existing 12-week reuse buffer for vanity paths already says when a path may be reused, and the rule follows it. Counting pending requests at approval: each of two pending requests would block the other.
+
+**Companion.** `UAMS-Web/aether-redirects#16`; who may type a back-half is `UAMS-Web/aether-redirects#13`.

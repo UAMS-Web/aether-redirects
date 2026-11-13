@@ -218,10 +218,10 @@ it('approves a generated back-half that only a rejected request, a pending one o
     'an approved rule on another domain' => [['host' => 'uams.health', 'status' => 'approved']],
 ]);
 
-it('leaves a typed source to its own approval rules', function (): void {
-    // A typed path is not a generated back-half, so a live rule differing in case does not block it here
-    mrdSeed(['host' => 'uams.info', 'source' => '/Typed', 'target_url' => 'https://www.uams.edu/old', 'status' => 'approved']);
-    $request = mrdGeneratedRequest('/typed', [BackHalf::FIELD => false]);
+it('leaves a typed source off a vanity domain to its own approval rules', function (): void {
+    // A typed path on go.uams.edu is not a generated back-half, so a live rule differing in case does not block it here
+    mrdSeed(['host' => 'go.uams.edu', 'source' => '/Typed', 'target_url' => 'https://example.org/old', 'status' => 'approved']);
+    $request = mrdGeneratedRequest('/typed', [BackHalf::FIELD => false, 'host' => 'go.uams.edu', 'target_url' => 'https://example.org/new']);
 
     test()->actingAs(mrdApprover());
     test()->postJson(mrdRoute('marketing-redirects.approve', ['redirect' => $request->id()]))->assertOk();

@@ -31,6 +31,7 @@ use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 use UAMSWeb\Aether\Redirects\Support\ShortCode;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
+use UAMSWeb\Aether\Redirects\Support\TypedBackHalf;
 
 /**
  * Drives the marketing-redirect creation utility (UAMS-Web/uams-statamic-archive#1355).
@@ -190,6 +191,15 @@ class MarketingRedirectController extends CpController
                 ));
             } catch (CodeGenerationException $exception) {
                 return $this->unprocessable('source', $exception->getMessage());
+            }
+        }
+
+        // A back-half the requester typed on a vanity domain must pass its rules (UAMS-Web/aether-redirects#16).
+        if (! $generate && $redirect->host !== null && RedirectHosts::isVanity($redirect->host)) {
+            $typedError = TypedBackHalf::error($redirect->source, $this->rowsOnHost($domainStore->all(), $redirect->host));
+
+            if ($typedError !== null) {
+                return $this->unprocessable('source', $typedError);
             }
         }
 
@@ -395,7 +405,8 @@ class MarketingRedirectController extends CpController
             return $this->unprocessable('tagged_url', __('Tagged URL parameters are not set up on this site, so no tagged URL can be issued yet.'));
         }
 
-        // A generated back-half goes live only if no approved rule on its domain has issued it meanwhile.
+        // A back-half goes live only if no approved rule on its domain has issued it meanwhile,
+        // and a typed one passes its rules again (UAMS-Web/aether-redirects#16).
         $reissue = $this->reissueError($pending, $store);
 
         if ($reissue instanceof JsonResponse) {
@@ -701,11 +712,6 @@ class MarketingRedirectController extends CpController
      */
     private function reissueError(array $row, RedirectRequestStore $store): ?JsonResponse
     {
-        // Only a generated back-half carries this guarantee; a typed path keeps its own rules.
-        if (! BackHalf::wasGenerated($row)) {
-            return null;
-        }
-
         $host = RedirectHosts::normalize($row['host'] ?? null);
         $source = $row['source'] ?? null;
 
@@ -718,6 +724,13 @@ class MarketingRedirectController extends CpController
             $this->rowsOnHost($store->all(), $host),
             static fn (array $other): bool => RedirectStatus::fromRow($other) === RedirectStatus::Approved,
         );
+
+        // A back-half typed on a vanity domain passes every rule again; a typed path elsewhere keeps its own rules.
+        if (! BackHalf::wasGenerated($row)) {
+            $typedError = RedirectHosts::isVanity($host) ? TypedBackHalf::error($source, $approved) : null;
+
+            return $typedError === null ? null : $this->unprocessable('source', $typedError);
+        }
 
         if (! BackHalf::isIssued($source, $approved)) {
             return null;

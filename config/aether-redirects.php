@@ -26,6 +26,18 @@ declare(strict_types=1);
 return [
 
     /*
+    | The back-half a requester types on a vanity URL request (UAMS-Web/aether-redirects#16).
+    */
+    'back_half' => [
+
+        // Words a typed back-half may not be, compared without regard to case, such as ['admin', 'login'].
+        // Empty (the default) reserves nothing. The form (letters, numbers and hyphens, at most 50
+        // characters) and the `-QR` suffix rules are fixed in code.
+        'reserved' => [],
+
+    ],
+
+    /*
     | The Creative Services question on a redirect request (UAMS-Web/aether-redirects#25).
     |
     | Every request answers whether it involves Creative Services, and a "yes" needs a
