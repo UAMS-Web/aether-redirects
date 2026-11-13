@@ -623,6 +623,25 @@ it('redraws a back-half that a rule on the domain has issued in another case', f
     'a redirect whose window has ended' => [['status' => 'approved', 'valid_from' => '2020-01-01', 'valid_until' => '2020-01-31']],
 ]);
 
+it('counts a rule on the domain in either case as issuing a back-half, so every draw fails', function (array $issued): void {
+    /** @var array<string, mixed> $issued */
+    // One draw over `ab`, with both letters issued in the other case: a check that missed either would let it through
+    mrdGenerator('ab', 1, 1);
+    mrdSeed(['host' => 'uams.info', 'source' => '/A', 'target_url' => 'https://www.uams.edu/old', ...$issued]);
+    mrdSeed(['host' => 'uams.info', 'source' => '/b', 'target_url' => 'https://www.uams.edu/old', ...$issued]);
+
+    mrdSubmit(mrdCreator(), ['source' => ''])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('source');
+
+    expect(mrdEntryCount())->toBe(2);
+})->with([
+    'a live redirect' => [['status' => 'approved']],
+    'a pending request' => [['status' => 'pending']],
+    'a redirect with no status' => [[]],
+    'a redirect whose window has ended' => [['status' => 'approved', 'valid_from' => '2020-01-01', 'valid_until' => '2020-01-31']],
+]);
+
 it('does not count a rejected request, or a rule on another domain, as issuing a back-half', function (array $taken): void {
     /** @var array<string, mixed> $taken */
     // One draw over `ab`: it succeeds only when neither `/a` nor `/b` counts as issued
@@ -664,7 +683,7 @@ it('approves only the first of two pending back-halves that differ only in case'
     $response->assertStatus(422)
         ->assertJsonValidationErrors('source');
 
-    expect($response->json('errors.source.0'))->toBe('The back-half /ab3xy9q is already live on uams.info in another case. Reject this request so it can be submitted again for a new back-half.')
+    expect($response->json('errors.source.0'))->toBe('The back-half /ab3xy9q has already been issued on uams.info in another case. Reject this request so it can be submitted again for a new back-half.')
         ->and(mrdField(mrdId($first), 'status'))->toBe('approved')
         ->and(mrdField(mrdId($second), 'status'))->toBe('pending');
 
@@ -719,3 +738,48 @@ it('tells the create screen which domains generate a back-half', function (): vo
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('generatedHosts', ['uams.info', 'uams.health', 'uamsbaptist.health']));
 });
+
+it('generates a back-half for a whitespace source even without the middleware that trims it', function (): void {
+    // Without the middleware, the spaces arrive as sent and must not become a rule for the domain's root
+    test()->withoutMiddleware([TrimStrings::class, CpTrimStrings::class, ConvertEmptyStringsToNull::class]);
+
+    $response = mrdSubmit(mrdCreator(), ['source' => '   ']);
+
+    $response->assertCreated();
+
+    expect($response->json('redirect.source'))->toMatch('#^/[A-Za-z0-9]{7}$#')
+        ->and($response->json('redirect.'.BackHalf::FIELD))->toBeTrue();
+});
+
+it('ignores a generated flag the requester submits', function (): void {
+    $response = mrdSubmit(mrdCreator(), ['source' => '/typed', BackHalf::FIELD => true]);
+
+    $response->assertCreated();
+
+    /** @var string $id */
+    $id = $response->json('redirect.id');
+
+    expect(mrdField($id, BackHalf::FIELD))->toBeFalse();
+});
+
+it('refuses to generate with a generator binding that is not a code generator', function (): void {
+    app()->bind(BackHalf::GENERATOR, static fn (): stdClass => new stdClass);
+    test()->withoutExceptionHandling();
+
+    expect(fn (): TestResponse => mrdSubmit(mrdCreator(), ['source' => '']))
+        ->toThrow(LogicException::class, 'The "aether-redirects.back-half-generator" binding must resolve to a '.RandomCode::class.'.');
+
+    expect(mrdEntryCount())->toBe(0);
+});
+
+it('approves a flagged entry that has lost its domain or its source, since there is nothing to compare', function (array $broken): void {
+    /** @var array<string, mixed> $broken */
+    mrdSeed(['host' => 'uams.info', 'source' => '/AB3XY9Q', 'target_url' => 'https://www.uams.edu/old', 'status' => 'approved']);
+    $request = mrdGeneratedRequest('/aB3xY9q', $broken);
+
+    test()->actingAs(mrdApprover());
+    test()->postJson(mrdRoute('marketing-redirects.approve', ['redirect' => $request->id()]))->assertOk();
+})->with([
+    'no domain' => [['host' => null]],
+    'a source that is not a string' => [['source' => ['/aB3xY9q']]],
+]);

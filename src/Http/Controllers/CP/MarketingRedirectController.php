@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use LogicException;
 use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\User;
 use Statamic\Http\Controllers\CP\CpController;
@@ -103,6 +104,8 @@ class MarketingRedirectController extends CpController
 
         // Build the canonical redirect, tagging the authenticated creator so the
         // approval slice can forbid self-approval (UAMS-Web/uams-statamic-archive#1357).
+        // The '' stands in only for a source that is about to be generated, which replaces it.
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
         $redirect = MarketingRedirect::fromInput([...$validated, 'source' => $validated['source'] ?? ''], $this->currentUserId());
 
         // An inverted window (start after end) could never serve — reject it.
@@ -127,13 +130,17 @@ class MarketingRedirectController extends CpController
         // Draw the back-half against every row on the domain that has issued one; a
         // domain request always has a host here, since only a vanity domain may omit the source.
         if ($generate && $redirect->host !== null) {
-            // The provider binds the back-half generator; anything else bound there falls back to it.
+            // The provider binds the back-half generator; a host that rebinds it to anything else has misconfigured it.
             $generator = app(BackHalf::GENERATOR);
+
+            if (! $generator instanceof RandomCode) {
+                throw new LogicException(sprintf('The "%s" binding must resolve to a %s.', BackHalf::GENERATOR, RandomCode::class));
+            }
 
             try {
                 $redirect = $redirect->withGeneratedBackHalf(BackHalf::generate(
                     $this->rowsOnHost($domainStore->all(), $redirect->host),
-                    $generator instanceof RandomCode ? $generator : null,
+                    $generator,
                 ));
             } catch (CodeGenerationException $exception) {
                 return $this->unprocessable('source', $exception->getMessage());
@@ -191,14 +198,14 @@ class MarketingRedirectController extends CpController
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
         $store = $this->storeHolding($redirect, $globalStore, $domainStore);
-        $error = $this->guardReviewable($redirect, $store);
+        $pending = $this->reviewableRow($redirect, $store);
 
-        if ($error instanceof JsonResponse) {
-            return $error;
+        if ($pending instanceof JsonResponse) {
+            return $pending;
         }
 
-        // A generated back-half goes live only if no other live rule on its domain has issued it meanwhile.
-        $reissue = $this->reissueError($redirect, $store);
+        // A generated back-half goes live only if no approved rule on its domain has issued it meanwhile.
+        $reissue = $this->reissueError($pending, $store);
 
         if ($reissue instanceof JsonResponse) {
             return $reissue;
@@ -239,10 +246,10 @@ class MarketingRedirectController extends CpController
 
         // Reject an unknown id, an already-reviewed row, or a self-review.
         $store = $this->storeHolding($redirect, $globalStore, $domainStore);
-        $error = $this->guardReviewable($redirect, $store);
+        $pending = $this->reviewableRow($redirect, $store);
 
-        if ($error instanceof JsonResponse) {
-            return $error;
+        if ($pending instanceof JsonResponse) {
+            return $pending;
         }
 
         // Record the rejection with its reason. The '' fallback is unreachable for
@@ -331,48 +338,46 @@ class MarketingRedirectController extends CpController
     }
 
     /**
-     * The error for approving a generated back-half that another live rule on its domain has issued.
+     * The error for approving a generated back-half that another rule on its domain has issued.
      *
      * Creation drew the back-half against every row on its domain, but another
-     * request may have taken the same back-half in another case since, and gone
-     * live first (UAMS-Web/aether-redirects#15). Only approved rows block here: a
-     * pending one has not gone live, and counting it would let two pending
-     * requests each block the other. Rows whose window has ended still block, as
-     * at creation, because their links stay in circulation.
+     * request may have taken the same back-half in another case since, and been
+     * approved first (UAMS-Web/aether-redirects#15). Only approved rows block
+     * here: a pending one has not gone live, and counting it would let two
+     * pending requests each block the other. Rows whose window has ended still
+     * block, as at creation, because their links stay in circulation. The
+     * request being approved is pending, so it never blocks itself.
      *
-     * @param  string  $id  The request being approved
+     * @param  array<string, mixed>  $row  The pending request being approved
      * @param  RedirectRequestStore  $store  The store holding it
      * @return JsonResponse|null A 422, or null when the request may go live
      */
-    private function reissueError(string $id, RedirectRequestStore $store): ?JsonResponse
+    private function reissueError(array $row, RedirectRequestStore $store): ?JsonResponse
     {
-        $row = $store->find($id);
-
-        // Only a generated back-half on a domain carries this guarantee; a typed path keeps its own rules.
-        if ($row === null || ! BackHalf::wasGenerated($row)) {
+        // Only a generated back-half carries this guarantee; a typed path keeps its own rules.
+        if (! BackHalf::wasGenerated($row)) {
             return null;
         }
 
         $host = RedirectHosts::normalize($row['host'] ?? null);
         $source = $row['source'] ?? null;
 
-        // A generated row always has both; one without either has nothing to compare.
+        // A hand-edited entry can lose its host or source, and then there is nothing to compare.
         if ($host === null || ! \is_string($source)) {
             return null;
         }
 
-        $live = array_filter(
+        $approved = array_filter(
             $this->rowsOnHost($store->all(), $host),
-            static fn (array $other): bool => ($other['id'] ?? null) !== $id
-                && RedirectStatus::fromRow($other) === RedirectStatus::Approved,
+            static fn (array $other): bool => RedirectStatus::fromRow($other) === RedirectStatus::Approved,
         );
 
-        if (! BackHalf::isIssued($source, $live)) {
+        if (! BackHalf::isIssued($source, $approved)) {
             return null;
         }
 
         return $this->unprocessable('source', __(
-            'The back-half :source is already live on :host in another case. Reject this request so it can be submitted again for a new back-half.',
+            'The back-half :source has already been issued on :host in another case. Reject this request so it can be submitted again for a new back-half.',
             ['source' => $source, 'host' => $host]
         ));
     }
@@ -386,6 +391,8 @@ class MarketingRedirectController extends CpController
      */
     private function rowsOnHost(array $rows, string $host): array
     {
+        // Reindexing is equivalent: every caller only iterates the rows.
+        // @pest-mutate-ignore:UnwrapArrayValues
         return array_values(array_filter(
             $rows,
             static fn (array $row): bool => RedirectHosts::normalize($row['host'] ?? null) === $host,
@@ -485,18 +492,18 @@ class MarketingRedirectController extends CpController
     }
 
     /**
-     * Guard that a redirect id is a pending request the current user may review.
+     * The pending request a redirect id names, when the current user may review it.
      *
-     * Returns null when the request may be reviewed, or a JsonResponse describing
-     * why it may not: a 404 for an unknown id, a 422 for an already-reviewed
-     * request, and a 403 when the current user is the one who submitted it (no
-     * self-approve).
+     * Returns the stored row when the request may be reviewed, or a JsonResponse
+     * describing why it may not: a 404 for an unknown id, a 422 for an
+     * already-reviewed request, and a 403 when the current user is the one who
+     * submitted it (no self-approve).
      *
      * @param  string  $id  The candidate redirect row id
      * @param  RedirectRequestStore  $store  The store that holds, or would hold, the request
-     * @return JsonResponse|null An error response, or null when the request is reviewable
+     * @return array<string, mixed>|JsonResponse The reviewable row, or an error response
      */
-    private function guardReviewable(string $id, RedirectRequestStore $store): ?JsonResponse
+    private function reviewableRow(string $id, RedirectRequestStore $store): array|JsonResponse
     {
         // An unknown id has nothing to review.
         $row = $store->find($id);
@@ -521,7 +528,7 @@ class MarketingRedirectController extends CpController
         }
 
         // No error: the request is reviewable.
-        return null;
+        return $row;
     }
 
     /**

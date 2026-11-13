@@ -71,6 +71,6 @@ tabs:
             field:
               type: toggle
               display: 'Generated back-half'
-              instructions: 'On when the utility generated this source on a vanity domain. Approval refuses a generated back-half that a live rule on the domain has issued in any case.'
+              instructions: 'On when the utility generated this source on a vanity domain. Approval refuses a generated back-half that an approved rule on the domain has issued in any case, including one whose window has ended.'
               visibility: read_only
               width: 33

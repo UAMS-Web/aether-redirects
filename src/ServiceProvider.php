@@ -65,8 +65,6 @@ class ServiceProvider extends AddonServiceProvider
      */
     public function register(): void
     {
-        parent::register();
-
         $this->app->bind(BackHalf::GENERATOR, static fn (): RandomCode => BackHalf::generator());
     }
 
