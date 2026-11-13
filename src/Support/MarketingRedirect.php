@@ -140,10 +140,10 @@ final readonly class MarketingRedirect
      * (UAMS-Web/aether-redirects#83).
      *
      * The same fields as {@see toRow()} without the replicator `id` and `type`, plus
-     * the `host` the entry answers on, so the engine and the edge manifest apply
+     * the `host` the entry answers on (the id of its domain record), so the engine and the edge manifest apply
      * the same status and validity gates to it as to a global-set row.
      *
-     * @param  string  $host  The redirect domain the rule serves on
+     * @param  string  $host  The id of the domain record the rule serves on
      * @return array<string, mixed> The entry data
      */
     public function toDomainData(string $host): array

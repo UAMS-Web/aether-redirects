@@ -1,0 +1,10 @@
+title: 'Redirect Domain List'
+icon: link
+sites:
+  - default
+propagate: false
+revisions: false
+slugs: false
+title_format: '{{ host }}'
+sort_by: title
+sort_dir: asc

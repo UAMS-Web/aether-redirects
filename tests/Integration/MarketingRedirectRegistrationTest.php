@@ -24,9 +24,11 @@ use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\ServiceProvider;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 // Stache-isolated: every Stache store, users included, is re-rooted into this
 // process's throwaway directory, and roles go to a per-test path below.
@@ -152,6 +154,10 @@ function marketingRedirectRegistrationNavItems(): array
     return $items;
 }
 
+it('registers the permission to manage redirect domains with a label', function (): void {
+    expect(Permission::get(RedirectDomainList::PERMISSION)->label())->toBe('Manage redirect domains');
+});
+
 it('registers the request and approval permissions', function (): void {
     expect(Permission::get(MarketingRedirectController::PERMISSION))->not->toBeNull()
         ->and(Permission::get(MarketingRedirectController::APPROVE_PERMISSION))->not->toBeNull();
@@ -214,6 +220,8 @@ it('adds the pending domain requests to the pending count', function (int $globa
             MarketingRedirect::fromInput(['source' => '/pending-'.$i, 'destination' => '/target'])
         );
     }
+
+    RedirectDomainRecords::idFor('uams.info');
 
     for ($i = 0; $i < $domain; $i++) {
         app(RedirectDomainStore::class)->create(

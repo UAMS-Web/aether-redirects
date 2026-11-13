@@ -15,6 +15,7 @@ use Statamic\Facades\Stache;
 use Statamic\Stache\Stores\CollectionsStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 // Stache-isolated: each test saves redirect domain entries.
 uses(IsolatesStache::class);
@@ -60,7 +61,7 @@ function domainRulesEntry(array $data): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data($data);
+    $entry->data(RedirectDomainRecords::refer($data));
     $entry->save();
 
     return $entry;
@@ -162,7 +163,7 @@ it('returns the hosts sorted, whatever order the entry titles sort in', function
         $entry->collection('hand_titled_domains');
         $entry->locale('default');
         $entry->published(true);
-        $entry->data(['title' => $title, 'host' => $host, 'source' => '/a', 'target_url' => 'https://uams.edu']);
+        $entry->data(['title' => $title, 'host' => RedirectDomainRecords::idFor($host), 'source' => '/a', 'target_url' => 'https://uams.edu']);
         $entry->save();
     }
 
@@ -175,7 +176,10 @@ it('normalizes a host with surrounding space, capitals and a trailing dot, and r
 });
 
 it('names an entry whose host is not a domain, and leaves it out', function (): void {
-    $entry = domainRulesEntry(['host' => 'not a domain', 'source' => '/a', 'target_url' => 'https://agec.uams.edu']);
+    // The domain list refuses a host that is not a domain, so the stored value is changed behind its back
+    $entry = domainRulesEntry(['host' => 'agec.org', 'source' => '/a', 'target_url' => 'https://agec.uams.edu']);
+    $entry->set('host', 'not a domain');
+    $entry->saveQuietly();
 
     $read = (new RedirectDomainRules)->read();
 

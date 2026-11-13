@@ -10,12 +10,11 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
-use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\User;
 use Statamic\Http\Controllers\CP\CpController;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
-use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
+use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
 use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
@@ -478,17 +477,13 @@ class MarketingRedirectController extends CpController
     }
 
     /**
-     * The domains a request can be made for: the vanity domains and every domain the collection serves.
+     * The domains a request can be made for: the hosts in the domain list.
      *
-     * @return list<string> The vanity domains, then the other domains the collection serves in alphabetical order
+     * @return list<string> The hosts in alphabetical order
      */
     private function hostOptions(): array
     {
-        // A host without the collection still offers the vanity domains, whose requests then fail on save
-        $served = CollectionFacade::findByHandle(RedirectDomainRules::COLLECTION) === null ? [] : RedirectDomainRules::publishedHosts();
-        sort($served);
-
-        return array_values(array_unique([...RedirectHosts::VANITY, ...$served]));
+        return RedirectDomainList::hosts();
     }
 
     /**
@@ -496,9 +491,12 @@ class MarketingRedirectController extends CpController
      */
     private function canApprove(): bool
     {
-        // Every caller runs behind the CP auth middleware, so there is always a current user and the null-safe call never short-circuits
+        $user = User::current();
+
+        // Every caller runs behind the CP auth middleware, so there is always a current user and the null-safe
+        // calls never short-circuit; a super user holds every permission without listing it
         // @pest-mutate-ignore:RemoveNullSafeOperator
-        return User::current()?->hasPermission(self::APPROVE_PERMISSION) === true;
+        return $user?->isSuper() === true || $user?->hasPermission(self::APPROVE_PERMISSION) === true;
     }
 
     /**

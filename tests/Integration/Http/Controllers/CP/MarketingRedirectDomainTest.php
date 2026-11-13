@@ -34,6 +34,7 @@ use UAMSWeb\Aether\Redirects\Services\EdgeRedirectManifestBuilder;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainRules;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
+use UAMSWeb\Aether\Redirects\Tests\Support\RedirectDomainRecords;
 
 /**
  * HTTP coverage for the approval workflow on the `redirect_domains` collection
@@ -112,7 +113,7 @@ function mrdSeed(array $data): StatamicEntry
     $entry->collection(RedirectDomainRules::COLLECTION);
     $entry->locale('default');
     $entry->published(true);
-    $entry->data([
+    $entry->data(RedirectDomainRecords::refer([
         'enabled' => true,
         'whole_domain' => false,
         'use_regex' => false,
@@ -120,7 +121,7 @@ function mrdSeed(array $data): StatamicEntry
         'response' => '301',
         'order' => 30,
         ...$data,
-    ]);
+    ]));
     $entry->save();
 
     return $entry;
@@ -236,6 +237,11 @@ beforeEach(function (): void {
     Assert::assertInstanceOf(StatamicCollection::class, $collection);
 
     $collection->save();
+
+    // The domain list: the vanity domains and the short-link domain
+    foreach (['uams.info', 'uams.health', 'uamsbaptist.health', 'go.uams.edu'] as $host) {
+        RedirectDomainRecords::idFor($host);
+    }
 });
 
 it('saves a request as a pending entry that does not serve until an approver approves it', function (): void {
@@ -254,7 +260,7 @@ it('saves a request as a pending entry that does not serve until an approver app
     Assert::assertInstanceOf(StatamicEntry::class, $entry);
 
     expect($entry->collectionHandle())->toBe('redirect_domains')
-        ->and($entry->get('host'))->toBe('uams.info')
+        ->and($entry->get('host'))->toBe(RedirectDomainRecords::idFor('uams.info'))
         ->and($entry->get('source'))->toBe('/flu')
         ->and($entry->get('status'))->toBe('pending')
         ->and($entry->get('submitted_by'))->toBe($creator->id())
@@ -362,6 +368,14 @@ it('refuses a mismatched domain from a creator and allows it from an approver', 
     'relative destination on uams.info' => ['uams.info', '/clinics'],
 ]);
 
+it('lets a super user save a mismatched domain, since a super user holds every permission', function (): void {
+    $user = mrdCreator();
+    $user->makeSuper();
+    $user->save();
+
+    mrdSubmit($user, ['host' => 'uams.info', 'destination' => 'https://uamshealth.com/clinics'])->assertCreated();
+});
+
 it('refuses a domain that is not a redirect domain', function (string|array $host, string $message): void {
     $response = mrdSubmit(mrdCreator(), ['host' => $host]);
 
@@ -454,7 +468,7 @@ it('hands the create screen the domains a request can be made for', function ():
     test()->get(mrdRoute('marketing-redirects.create'))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('hostOptions', ['uams.info', 'uams.health', 'uamsbaptist.health', 'go.uams.edu', 'zz.example.org'])
+            ->where('hostOptions', ['go.uams.edu', 'uams.health', 'uams.info', 'uamsbaptist.health', 'zz.example.org'])
             ->where('canApprove', false));
 });
 

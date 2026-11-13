@@ -46,7 +46,7 @@ final class RedirectDomainStore implements RedirectRequestStore
      * @param  MarketingRedirect  $redirect  The request, with its host set.
      * @return array<string, mixed> The stored row, including the entry id.
      *
-     * @throws RuntimeException When the collection does not exist or the request has no host.
+     * @throws RuntimeException When the collection does not exist or the request has no host in the domain list.
      */
     public function create(MarketingRedirect $redirect): array
     {
@@ -54,6 +54,13 @@ final class RedirectDomainStore implements RedirectRequestStore
 
         if ($host === null) {
             throw new RuntimeException('A redirect domain request needs a host.');
+        }
+
+        // A rule refers to its domain's record, so a host nobody added to the list has none
+        $record = RedirectDomainList::idFor($host);
+
+        if ($record === null) {
+            throw new RuntimeException(sprintf('"%s" is not in the domain list.', $host));
         }
 
         if (CollectionFacade::findByHandle(RedirectDomainRules::COLLECTION) === null) {
@@ -65,10 +72,10 @@ final class RedirectDomainStore implements RedirectRequestStore
         /** @var StatamicEntry $entry */
         $entry = Entry::make();
         $entry->collection(RedirectDomainRules::COLLECTION);
-        $entry->data($redirect->toDomainData($host));
+        $entry->data($redirect->toDomainData($record));
         $entry->save();
 
-        return self::rowFor($entry);
+        return self::rowFor($entry, RedirectDomainList::records());
     }
 
     /**
@@ -81,7 +88,7 @@ final class RedirectDomainStore implements RedirectRequestStore
     {
         $entry = $this->entry($id);
 
-        return $entry instanceof StatamicEntry ? self::rowFor($entry) : null;
+        return $entry instanceof StatamicEntry ? self::rowFor($entry, RedirectDomainList::records()) : null;
     }
 
     /**
@@ -146,7 +153,7 @@ final class RedirectDomainStore implements RedirectRequestStore
         $entry->merge($fields);
         $entry->save();
 
-        return self::rowFor($entry);
+        return self::rowFor($entry, RedirectDomainList::records());
     }
 
     /**
@@ -194,6 +201,7 @@ final class RedirectDomainStore implements RedirectRequestStore
         /** @var Collection<int, mixed> $entries */
         $entries = $query->get();
 
+        $records = RedirectDomainList::records();
         $rows = [];
 
         foreach ($entries as $entry) {
@@ -204,7 +212,7 @@ final class RedirectDomainStore implements RedirectRequestStore
                 continue;
             }
 
-            $rows[] = self::rowFor($entry);
+            $rows[] = self::rowFor($entry, $records);
         }
 
         return $rows;
@@ -213,14 +221,21 @@ final class RedirectDomainStore implements RedirectRequestStore
     /**
      * An entry's data with its id, in the shape of a global-set row.
      *
+     * The `host` is the domain the entry's record names, so a row reads the same as
+     * a global-set row; a host that names no trusted domain is left as stored.
+     *
      * @param  StatamicEntry  $entry  The redirect domain entry.
+     * @param  array<string, string>  $records  The published domain records.
      * @return array<string, mixed>
      */
-    private static function rowFor(StatamicEntry $entry): array
+    private static function rowFor(StatamicEntry $entry, array $records): array
     {
         /** @var Collection<string, mixed> $data */
         $data = $entry->data();
+        $row = ['id' => $entry->id(), ...$data->all()];
 
-        return ['id' => $entry->id(), ...$data->all()];
+        $host = RedirectDomainList::resolve($row['host'] ?? null, $records);
+
+        return $host === null ? $row : [...$row, 'host' => $host];
     }
 }
