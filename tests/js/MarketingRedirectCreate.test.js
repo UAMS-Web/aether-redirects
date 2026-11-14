@@ -149,3 +149,81 @@ describe('a site with no lookup data', () => {
         expect(body).not.toHaveProperty('channel');
     });
 });
+
+// Mount the create page for a user who may request a vanity URL, which is the form's first kind.
+async function mountVanity(answer) {
+    const get = vi.fn(async () => ({ data: answer }));
+    const post = vi.fn().mockResolvedValue({ data: { message: 'Saved.' } });
+    const wrapper = mount(Create, {
+        props: {
+            storeUrl: '/store',
+            cascadeUrl: '/cascade',
+            taggedAvailable: true,
+            canRequestVanity: true,
+            hostOptions: ['uams.info'],
+            responseOptions: [{ value: '301', label: '301' }],
+        },
+        global: { config: { globalProperties: { __: (key) => key, $axios: { get, post } } } },
+    });
+
+    await flushPromises();
+
+    return { wrapper, get, post };
+}
+
+describe('a vanity request (UAMS-Web/aether-redirects#125)', () => {
+    it('shows the cascade and sends its choices with the vanity fields', async () => {
+        const { wrapper, post } = await mountVanity(cascade);
+
+        expect(wrapper.find('#mr-channel').exists()).toBe(true);
+
+        await fill(wrapper, '#mr-destination', 'https://www.uams.edu/clinics/flu');
+        await fill(wrapper, '#mr-channel', 'chan-social');
+        await fill(wrapper, '#mr-step-source', 'opt-facebook');
+        await fill(wrapper, '#mr-utm_campaign', 'flu-2026');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        const body = post.mock.calls[0][1];
+
+        expect(body).toMatchObject({
+            destination: 'https://www.uams.edu/clinics/flu',
+            channel: 'chan-social',
+            steps: { source: 'opt-facebook' },
+            utm_campaign: 'flu-2026',
+            suppress_utm: false,
+        });
+        expect(body).toHaveProperty('response');
+        expect(body).not.toHaveProperty('kind');
+    });
+
+    it('is unchanged for a site with no lookup data', async () => {
+        const { wrapper, post } = await mountVanity(empty);
+
+        expect(wrapper.find('#mr-channel').exists()).toBe(false);
+        expect(wrapper.find('#mr-utm_campaign').exists()).toBe(false);
+
+        await fill(wrapper, '#mr-destination', 'https://www.uams.edu/clinics/flu');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        const body = post.mock.calls[0][1];
+
+        expect(body).not.toHaveProperty('suppress_utm');
+        expect(body).not.toHaveProperty('channel');
+        expect(body).not.toHaveProperty('utm_campaign');
+    });
+
+    it('shows a refusal against the choice it names', async () => {
+        const { wrapper, post } = await mountVanity(cascade);
+
+        post.mockRejectedValue({ response: { status: 422, data: { errors: { 'steps.source': ['Pick a listed option.'] } } } });
+        await fill(wrapper, '#mr-destination', 'https://www.uams.edu/clinics/flu');
+        await fill(wrapper, '#mr-channel', 'chan-social');
+        await fill(wrapper, '#mr-step-source', 'opt-facebook');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(wrapper.find('[data-step="source"]').text()).toContain('Pick a listed option.');
+    });
+});

@@ -90,6 +90,17 @@ Each row of `custom_parameters` is one parameter. It can be added, renamed, reor
 | `source_type` | Where the value comes from: a request field, a lookup list, or a fixed value. A row with none counts as a lookup list. |
 | `request_field`, `list`, `fixed_value` | The source that matches the type. A row with no source for its type is ignored. |
 
+## Parameters the system fills on a vanity request
+
+Two request field handles are filled by the add-on when a vanity URL is requested with tagged URL choices, and the requester is never asked for them. A request that types one is refused.
+
+| Handle | Value |
+| --- | --- |
+| `vanity_url` | The vanity domain and back-half of the redirect, lowercased and percent-encoded, such as `uams.info%2Fflu`. Blank on a main-site request and when the request leaves the `utm_*` parameters off. |
+| `qr_code` | `false` on the vanity redirect and `true` on its `-QR` redirect. Blank on a main-site request. |
+
+Add a parameter whose `source_type` is `request_field` and whose `request_field` is one of these handles, such as `utm_vanity` and `utm_qr`, to put the values on the URL. The vanity redirect and its `-QR` redirect are each issued their own URL when an approver approves the request, and a later change to a list or a parameter leaves both as issued.
+
 ## How the URL is built
 
 - Parameters are added in order, standard first and then custom, each name and value percent-encoded, so a value with a space or an `&` still yields a valid URL.

@@ -209,3 +209,28 @@ it('offers the active options of any list, outside the cascade', function (): vo
     expect(taggedOptionIds(taggedExampleComposer()->optionsOfList('social-sources')))->toBe(['src-facebook', 'src-linkedin'])
         ->and(taggedExampleComposer()->optionsOfList('no-such-list'))->toBe([]);
 });
+
+it('round-trips a request through its stored form and ignores what is not text', function (): void {
+    $request = new TaggedUrlRequest('https://uams.edu/x', 'ch-social', ['source' => 'src-facebook'], ['audiences' => 'aud-staff'], ['audiences' => 'Extra'], ['utm_campaign' => 'flu'], true);
+
+    expect(TaggedUrlRequest::fromStored($request->toStored()))->toEqual($request)
+        ->and(TaggedUrlRequest::fromStored('junk'))->toEqual(new TaggedUrlRequest(''))
+        ->and(TaggedUrlRequest::fromStored(['channel' => '', 'steps' => ['a' => 1, 'b' => 'x'], 'suppress_utm' => 'yes']))
+        ->toEqual(new TaggedUrlRequest('', null, ['b' => 'x']));
+});
+
+it('fills the vanity and QR values the system owns, lowercased, and never asks for them', function (): void {
+    $composer = taggedExampleComposer([
+        new TaggedUrlParameter('utm_vanity', TaggedUrlParameter::FROM_REQUEST_FIELD, TaggedUrlParameter::reservedFields()['vanity']),
+        new TaggedUrlParameter('utm_qr', TaggedUrlParameter::FROM_REQUEST_FIELD, TaggedUrlParameter::reservedFields()['qr']),
+    ]);
+    $base = new TaggedUrlRequest('https://uams.edu/x');
+
+    expect($composer->requestFields())->toBe([])
+        ->and($composer->compose($base->placedOn('uams.info/Walk-QR', true)))->toBe('https://uams.edu/x?utm_vanity=uams.info%2Fwalk-qr&utm_qr=true')
+        ->and($composer->compose($base->placedOn('uams.info/walk', false)))->toBe('https://uams.edu/x?utm_vanity=uams.info%2Fwalk&utm_qr=false')
+        ->and($composer->compose($base->placedOn(null, false)))->toBe('https://uams.edu/x?utm_qr=false')
+        ->and($composer->compose($base))->toBe('https://uams.edu/x')
+        ->and(TaggedUrlParameter::isReserved('qr_code'))->toBeTrue()
+        ->and(TaggedUrlParameter::isReserved('vanity_path'))->toBeFalse();
+});

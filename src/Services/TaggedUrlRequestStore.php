@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace UAMSWeb\Aether\Redirects\Services;
 
+use Closure;
 use Illuminate\Support\Collection;
 use RuntimeException;
 use Statamic\Entries\Entry as StatamicEntry;
@@ -231,9 +232,10 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
      *
      * @param  string  $id  The entry id.
      * @param  string  $reviewerId  The Control Panel user id approving it.
+     * @param  Closure|null  $destinationFor  Unused: a tagged-only request issues its own URL
      * @return array<string, mixed>|null The updated row, or null when no entry has that id.
      */
-    public function approve(string $id, string $reviewerId): ?array
+    public function approve(string $id, string $reviewerId, ?Closure $destinationFor = null): ?array
     {
         $entry = $this->entry($id);
 
@@ -322,7 +324,17 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
      */
     public function choiceSummary(array $row): array
     {
-        $request = self::choices($row);
+        return $this->summaryOf(self::choices($row));
+    }
+
+    /**
+     * The choices of a request as an approver reads them: each option's label beside what it is for.
+     *
+     * @param  TaggedUrlRequest  $request  The request's choices
+     * @return list<array{name: string, option: string, custom: string|null}>
+     */
+    public function summaryOf(TaggedUrlRequest $request): array
+    {
         $catalog = $this->reader->catalog();
 
         // The parameter that reads each list names it
