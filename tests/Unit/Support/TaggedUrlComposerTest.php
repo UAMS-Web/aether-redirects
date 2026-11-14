@@ -177,3 +177,35 @@ it("carries a request's values as given", function (): void {
         ->toBe(['https://uams.edu/', 'c', ['source' => 's'], ['l' => 'o'], ['source' => 'x'], ['f' => 'v'], true])
         ->and((new TaggedUrlRequest('https://uams.edu/'))->suppressUtm)->toBeFalse();
 });
+
+it('lists the cascade steps an enabled parameter reads, in cascade order', function (): void {
+    $composer = taggedExampleComposer([
+        new TaggedUrlParameter('utm_medium', TaggedUrlParameter::FROM_STEP, 'medium'),
+        new TaggedUrlParameter('utm_source', TaggedUrlParameter::FROM_STEP, 'source'),
+        new TaggedUrlParameter('again', TaggedUrlParameter::FROM_STEP, 'source'),
+        new TaggedUrlParameter('utm_campaign', TaggedUrlParameter::FROM_REQUEST_FIELD, 'utm_campaign'),
+        new TaggedUrlParameter('org_unit', TaggedUrlParameter::FROM_LIST, 'medium'),
+        new TaggedUrlParameter('qr', TaggedUrlParameter::FROM_FIXED_VALUE, 'placement'),
+    ]);
+
+    expect($composer->stepsInUse())->toBe(['source', 'medium'])
+        ->and(taggedExampleComposer()->stepsInUse())->toBe([]);
+});
+
+it('lists the list-sourced parameters and the request fields the parameters read', function (): void {
+    $composer = taggedExampleComposer([
+        new TaggedUrlParameter('utm_campaign', TaggedUrlParameter::FROM_REQUEST_FIELD, 'utm_campaign'),
+        new TaggedUrlParameter('org_unit', TaggedUrlParameter::FROM_LIST, 'org-units'),
+        new TaggedUrlParameter('vanity', TaggedUrlParameter::FROM_REQUEST_FIELD, 'vanity_path'),
+        new TaggedUrlParameter('campaign_again', TaggedUrlParameter::FROM_REQUEST_FIELD, 'utm_campaign'),
+        new TaggedUrlParameter('utm_source', TaggedUrlParameter::FROM_STEP, 'source'),
+    ]);
+
+    expect(array_map(static fn (TaggedUrlParameter $parameter): string => $parameter->name, $composer->listParameters()))->toBe(['org_unit'])
+        ->and($composer->requestFields())->toBe(['utm_campaign', 'vanity_path']);
+});
+
+it('offers the active options of any list, outside the cascade', function (): void {
+    expect(taggedOptionIds(taggedExampleComposer()->optionsOfList('social-sources')))->toBe(['src-facebook', 'src-linkedin'])
+        ->and(taggedExampleComposer()->optionsOfList('no-such-list'))->toBe([]);
+});
