@@ -13,6 +13,7 @@ use Statamic\Facades\GlobalSet;
 use Statamic\Stache\Query\EntryQueryBuilder;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlParameter;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 
 /**
@@ -307,6 +308,50 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
             fields: $fields,
             suppressUtm: ($row[self::SUPPRESS_FIELD] ?? false) === true,
         );
+    }
+
+    /**
+     * The choices of a stored row as an approver reads them: each option's label beside what it is for.
+     *
+     * The channel comes first, then each step in cascade order, then each list choice named
+     * for the parameter that reads it. A choice whose option has since been removed shows its id,
+     * since the label is gone (UAMS-Web/aether-redirects#120).
+     *
+     * @param  array<string, mixed>  $row  A stored row.
+     * @return list<array{name: string, option: string, custom: string|null}>
+     */
+    public function choiceSummary(array $row): array
+    {
+        $request = self::choices($row);
+        $catalog = $this->reader->catalog();
+
+        // The parameter that reads each list names it
+        $listNames = [];
+
+        foreach ($this->reader->parameterList() as $parameter) {
+            if ($parameter->from === TaggedUrlParameter::FROM_LIST) {
+                $listNames[$parameter->source] = $parameter->name;
+            }
+        }
+
+        $label = static fn (string $id): string => $catalog->option($id)->label ?? $id;
+        $summary = [];
+
+        if ($request->channel !== null) {
+            $summary[] = ['name' => self::CHANNEL_FIELD, 'option' => $label($request->channel), 'custom' => null];
+        }
+
+        foreach (TaggedUrlLookup::steps() as $step) {
+            if (isset($request->steps[$step])) {
+                $summary[] = ['name' => $step, 'option' => $label($request->steps[$step]), 'custom' => $request->custom[$step] ?? null];
+            }
+        }
+
+        foreach ($request->lists as $listId => $optionId) {
+            $summary[] = ['name' => $listNames[$listId] ?? sprintf('%s', $listId), 'option' => $label($optionId), 'custom' => $request->custom[$listId] ?? null];
+        }
+
+        return $summary;
     }
 
     /**

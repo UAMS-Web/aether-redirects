@@ -19,7 +19,7 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
 const props = defineProps({
     // Pending requests: [{ id, kind, host, source, destination, response, requester, notes,
     // valid_from, valid_until, creative_services, job_number, can_review, approve_url, reject_url }],
-    // and tagged-only ones: [{ id, kind, destination, fields, suppress_utm, requester, notes,
+    // and tagged-only ones: [{ id, kind, destination, choices, fields, suppress_utm, requester, notes,
     // creative_services, job_number, can_review, approve_url, reject_url }]
     redirects: { type: Array, default: () => [] },
 });
@@ -146,6 +146,11 @@ async function confirmReject(row) {
                                     <p class="text-sm font-medium">
                                         {{ __('Tagged URL only') }}:
                                         <code>{{ row.destination }}</code>
+                                    </p>
+                                    <p v-if="row.choices && row.choices.length" class="mt-1 text-xs text-gray-500">
+                                        <span v-for="choice in row.choices" :key="choice.name" data-choice>
+                                            <code>{{ choice.name }}</code>: {{ choice.option }}<template v-if="choice.custom"> ({{ choice.custom }})</template> ·
+                                        </span>
                                     </p>
                                     <p class="mt-1 text-xs text-gray-500">
                                         <span v-for="(value, name) in row.fields" :key="name"><code>{{ name }}</code>={{ value }} · </span>

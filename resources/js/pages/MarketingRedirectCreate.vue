@@ -33,6 +33,12 @@ import { Header, Panel, Button } from '@statamic/cms/ui';
  * Every request answers whether it involves Creative Services, and a "yes" asks for
  * the job number (UAMS-Web/aether-redirects#25). The answer is made on purpose, with
  * no default, and the server refuses a vanity domain request that answers no.
+ *
+ * A tagged URL request walks the site's cascade (UAMS-Web/aether-redirects#120): the channel
+ * narrows the source, each further choice narrows the next step, and a step with no list of
+ * its own offers the generic one. The options come from the cascade endpoint, fetched again on
+ * every choice, and a choice the new options no longer offer is cleared. A site with no lookup
+ * data gets the three plain fields it always had.
  */
 const props = defineProps({
     // CP endpoint that validates + persists the redirect
@@ -59,6 +65,8 @@ const props = defineProps({
     taggedAvailable: { type: Boolean, default: false },
     // The job number format in words, from the add-on's `creative_services` setting
     jobNumberDescription: { type: String, default: '' },
+    // CP endpoint that answers the options each cascade step offers for the choices so far
+    cascadeUrl: { type: String, default: '' },
 });
 
 const instance = getCurrentInstance().proxy;
@@ -89,6 +97,11 @@ const blankForm = () => ({
     creative_services: '',
     job_number: '',
     qr: false,
+    channel: '',
+    steps: {},
+    lists: {},
+    custom_values: {},
+    fields: {},
 });
 
 // UAMS guidance on QR codes, which the two notices link to.
@@ -97,18 +110,153 @@ const qrGuidanceUrl = 'https://communications.uams.edu/web/kb/qr-codes/';
 // The fields each kind of request sends; the server refuses the vanity fields on a tagged-only request.
 const fieldsByKind = {
     redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'creative_services', 'job_number', 'requester', 'notes', 'qr'],
-    tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'creative_services', 'job_number', 'requester', 'notes'],
+    tagged: ['kind', 'destination', 'suppress_utm', 'creative_services', 'job_number', 'requester', 'notes'],
 };
+
+// The three fields a site with no lookup data is asked for.
+const legacyFields = ['utm_campaign', 'utm_id', 'utm_marketing_tactic'];
 
 // Whether the form asks for a tagged URL alone.
 const taggedOnly = computed(() => form.value.kind === 'tagged');
 
 // The submission for the chosen kind of request.
 function payload() {
-    return Object.fromEntries(fieldsByKind[form.value.kind].map((field) => [field, form.value[field]]));
+    const body = Object.fromEntries(fieldsByKind[form.value.kind].map((field) => [field, form.value[field]]));
+
+    if (form.value.kind === 'tagged') {
+        Object.assign(body, taggedChoices());
+    }
+
+    return body;
+}
+
+// A map without its blank values.
+function filled(map) {
+    return Object.fromEntries(Object.entries(map).filter(([, value]) => typeof value === 'string' && value.trim() !== ''));
+}
+
+// The cascade choices and request fields of a tagged request, blanks left out.
+function taggedChoices() {
+    const choices = {};
+
+    if (form.value.channel !== '') {
+        choices.channel = form.value.channel;
+    }
+
+    for (const key of ['steps', 'lists', 'custom_values']) {
+        const map = filled(form.value[key]);
+
+        if (Object.keys(map).length) {
+            choices[key] = map;
+        }
+    }
+
+    const fields = hasCascade.value ? filled(form.value.fields) : filled(Object.fromEntries(legacyFields.map((field) => [field, form.value[field]])));
+
+    return { ...choices, ...fields };
 }
 
 const form = ref(blankForm());
+
+// What the cascade endpoint last offered: the channels, a step's options, a list's options, and the request fields.
+const cascade = ref({ channel: [], steps: [], lists: [], fields: [] });
+const cascadeLoaded = ref(false);
+
+// Whether the site has anything to choose from, so the plain fields are not needed.
+const hasCascade = computed(() => cascade.value.channel.length > 0 || cascade.value.steps.length > 0 || cascade.value.lists.length > 0 || cascade.value.fields.length > 0);
+
+// The request fields shown: the site's handles, or the plain three when it has no lookup data.
+const requestFields = computed(() => (hasCascade.value ? cascade.value.fields : legacyFields));
+
+// The id of the latest fetch, so a slow answer to an earlier choice is dropped.
+let cascadeRequest = 0;
+
+// Whether a choice is one of the options offered.
+const offers = (options, id) => options.some((option) => option.id === id);
+
+// Keep the choices the options still offer, and the custom values beside them.
+function keepChoices(entries, key, chosen, custom) {
+    const kept = {};
+
+    for (const entry of entries) {
+        const id = entry[key];
+        const choice = chosen[id];
+
+        if (typeof choice === 'string' && choice !== '' && offers(entry.options, choice)) {
+            kept[id] = choice;
+        }
+
+        if (typeof form.value.custom_values[id] === 'string' && form.value.custom_values[id] !== '') {
+            custom[id] = form.value.custom_values[id];
+        }
+    }
+
+    return kept;
+}
+
+// Fetch the options for the choices so far, then drop each choice they no longer offer.
+async function loadCascade() {
+    if (!props.cascadeUrl || !props.taggedAvailable) {
+        return;
+    }
+
+    const request = ++cascadeRequest;
+
+    try {
+        const { data } = await instance.$axios.get(props.cascadeUrl, {
+            params: { channel: form.value.channel, steps: filled(form.value.steps), lists: filled(form.value.lists) },
+        });
+
+        if (request !== cascadeRequest) {
+            return;
+        }
+
+        cascade.value = { channel: data.channel || [], steps: data.steps || [], lists: data.lists || [], fields: data.fields || [] };
+        cascadeLoaded.value = true;
+
+        const custom = {};
+        const steps = keepChoices(cascade.value.steps, 'step', form.value.steps, custom);
+        const lists = keepChoices(cascade.value.lists, 'list', form.value.lists, custom);
+        if (form.value.channel !== '' && !offers(cascade.value.channel, form.value.channel)) {
+            form.value.channel = '';
+        }
+
+        form.value.steps = steps;
+        form.value.lists = lists;
+        form.value.custom_values = custom;
+
+        // A cleared choice changes what follows it, and the watcher above asks again
+    } catch {
+        if (request === cascadeRequest) {
+            cascadeLoaded.value = true;
+        }
+    }
+}
+
+// A choice at the channel, a step or a list narrows what follows.
+watch(
+    () => [form.value.channel, JSON.stringify(form.value.steps), JSON.stringify(form.value.lists)],
+    () => {
+        if (form.value.kind === 'tagged') {
+            loadCascade();
+        }
+    },
+);
+
+// Choosing a tagged request asks for the cascade, and does so once.
+watch(
+    () => form.value.kind,
+    (kind) => {
+        if (kind === 'tagged' && !cascadeLoaded.value) {
+            loadCascade();
+        }
+    },
+    { immediate: true },
+);
+
+// The label a step or list is shown under.
+const labelFor = (key) => String(key).replace(/[_-]+/g, ' ');
+
 const errors = ref({});
 const saving = ref(false);
 const successMessage = ref(null);
@@ -320,9 +468,45 @@ async function submit() {
                 </div>
 
                 <template v-if="taggedOnly">
-                    <div v-for="field in ['utm_campaign', 'utm_id', 'utm_marketing_tactic']" :key="field">
+                    <div v-if="cascade.channel.length">
+                        <label class="mb-1 block text-sm font-medium" for="mr-channel">{{ __('Channel') }}</label>
+                        <select id="mr-channel" v-model="form.channel" :class="inputClass">
+                            <option value="">{{ __('Choose a channel') }}</option>
+                            <option v-for="option in cascade.channel" :key="option.id" :value="option.id">{{ option.label }}</option>
+                        </select>
+                        <p v-if="errorFor('channel')" class="mt-1 text-xs text-red-600" v-text="errorFor('channel')" />
+                    </div>
+
+                    <div v-for="entry in cascade.steps" :key="entry.step" :data-step="entry.step">
+                        <label class="mb-1 block text-sm font-medium" :for="`mr-step-${entry.step}`">{{ labelFor(entry.step) }}</label>
+                        <div class="flex gap-2">
+                            <select :id="`mr-step-${entry.step}`" v-model="form.steps[entry.step]" :class="inputClass">
+                                <option value="">{{ __('Choose an option') }}</option>
+                                <option v-for="option in entry.options" :key="option.id" :value="option.id">{{ option.label }}</option>
+                            </select>
+                            <input v-model="form.custom_values[entry.step]" type="text" :class="inputClass" :placeholder="__('Or type a value')" :aria-label="labelFor(entry.step)" autocomplete="off" />
+                        </div>
+                        <p v-if="errorFor(`steps.${entry.step}`)" class="mt-1 text-xs text-red-600" v-text="errorFor(`steps.${entry.step}`)" />
+                        <p v-if="errorFor(`custom_values.${entry.step}`)" class="mt-1 text-xs text-red-600" v-text="errorFor(`custom_values.${entry.step}`)" />
+                    </div>
+
+                    <div v-for="entry in cascade.lists" :key="entry.list" :data-list="entry.list">
+                        <label class="mb-1 block text-sm font-medium" :for="`mr-list-${entry.list}`">{{ labelFor(entry.parameter) }}</label>
+                        <div class="flex gap-2">
+                            <select :id="`mr-list-${entry.list}`" v-model="form.lists[entry.list]" :class="inputClass">
+                                <option value="">{{ __('Choose an option') }}</option>
+                                <option v-for="option in entry.options" :key="option.id" :value="option.id">{{ option.label }}</option>
+                            </select>
+                            <input v-model="form.custom_values[entry.list]" type="text" :class="inputClass" :placeholder="__('Or type a value')" :aria-label="labelFor(entry.parameter)" autocomplete="off" />
+                        </div>
+                        <p v-if="errorFor(`lists.${entry.list}`)" class="mt-1 text-xs text-red-600" v-text="errorFor(`lists.${entry.list}`)" />
+                        <p v-if="errorFor(`custom_values.${entry.list}`)" class="mt-1 text-xs text-red-600" v-text="errorFor(`custom_values.${entry.list}`)" />
+                    </div>
+
+                    <div v-for="field in requestFields" :key="field">
                         <label class="mb-1 block text-sm font-medium" :for="`mr-${field}`"><code>{{ field }}</code></label>
-                        <input :id="`mr-${field}`" v-model="form[field]" type="text" :class="inputClass" autocomplete="off" />
+                        <input v-if="hasCascade" :id="`mr-${field}`" v-model="form.fields[field]" type="text" :class="inputClass" autocomplete="off" />
+                        <input v-else :id="`mr-${field}`" v-model="form[field]" type="text" :class="inputClass" autocomplete="off" />
                         <p v-if="errorFor(field)" class="mt-1 text-xs text-red-600" v-text="errorFor(field)" />
                     </div>
 
