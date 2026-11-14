@@ -88,11 +88,15 @@ const blankForm = () => ({
     suppress_utm: false,
     creative_services: '',
     job_number: '',
+    qr: false,
 });
+
+// UAMS guidance on QR codes, which the two notices link to.
+const qrGuidanceUrl = 'https://communications.uams.edu/web/kb/qr-codes/';
 
 // The fields each kind of request sends; the server refuses the vanity fields on a tagged-only request.
 const fieldsByKind = {
-    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'creative_services', 'job_number', 'requester', 'notes'],
+    redirect: ['host', 'short_link', 'source', 'destination', 'response', 'valid_from', 'valid_until', 'creative_services', 'job_number', 'requester', 'notes', 'qr'],
     tagged: ['kind', 'destination', 'utm_campaign', 'utm_id', 'utm_marketing_tactic', 'suppress_utm', 'creative_services', 'job_number', 'requester', 'notes'],
 };
 
@@ -142,6 +146,16 @@ watch(
 
 // Whether the chosen domain generates a back-half when the source is left blank.
 const generatesBackHalf = computed(() => props.generatedHosts.includes(form.value.host));
+
+// Whether the form offers a QR code: a vanity URL has one to make, a request on any other domain does not.
+const offersQr = computed(() => !taggedOnly.value && generatesBackHalf.value);
+
+// A code is made for a vanity URL, so leaving the vanity domains drops the request for one.
+watch(offersQr, (offered) => {
+    if (!offered) {
+        form.value.qr = false;
+    }
+});
 
 // Whether the Generate code button applies to the chosen domain.
 const offersShortCode = computed(() => props.shortLinkHost !== null && form.value.host === props.shortLinkHost);
@@ -203,7 +217,7 @@ async function submit() {
         const { data } = await instance.$axios.post(props.storeUrl, payload());
 
         // Report success and clear the form for the next redirect.
-        successMessage.value = data.message;
+        successMessage.value = data.qr ? data.message + ' ' + __('Its QR code redirect is saved with it, and both go live together.') : data.message;
         form.value = blankForm();
         hostTouched.value = false;
     } catch (error) {
@@ -320,6 +334,27 @@ async function submit() {
                         <p v-if="errorFor('suppress_utm')" class="mt-1 text-xs text-red-600" v-text="errorFor('suppress_utm')" />
                     </div>
                 </template>
+
+                <div v-if="offersQr" class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                    <label class="flex items-center gap-2 text-sm font-medium">
+                        <input v-model="form.qr" type="checkbox" name="qr" />
+                        {{ __('Also make a QR code') }}
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('A second redirect, the vanity URL with -QR added, is saved with this one. The code encodes that URL, so scans are counted apart from typed visits.') }}
+                    </p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600 dark:text-gray-400">
+                        <li>
+                            {{ __('A QR code must always be printed with the visible text URL beside it.') }}
+                            <a :href="qrGuidanceUrl" target="_blank" rel="noopener" class="underline">{{ __('QR code guidance') }}</a>
+                        </li>
+                        <li>
+                            {{ __('Do not make your own QR code from the visible text URL, because scans would count as typed visits. Making your own from the QR URL is fine.') }}
+                            <a :href="qrGuidanceUrl" target="_blank" rel="noopener" class="underline">{{ __('QR code guidance') }}</a>
+                        </li>
+                    </ul>
+                    <p v-if="errorFor('qr')" class="mt-1 text-xs text-red-600" v-text="errorFor('qr')" />
+                </div>
 
                 <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-response">{{ __('Redirect type') }}</label>
