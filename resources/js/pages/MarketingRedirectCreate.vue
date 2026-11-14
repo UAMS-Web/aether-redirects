@@ -43,6 +43,8 @@ const props = defineProps({
     canRequestVanity: { type: Boolean, default: true },
     // Whether the current user can type a back-half; the generated level leaves the source blank
     canTypeBackHalf: { type: Boolean, default: true },
+    // Whether the current user can name the main site, which only the widest level can
+    canChooseAnyDomain: { type: Boolean, default: true },
     // The short-link domain, when the current user can make short links there, else null
     shortLinkHost: { type: String, default: null },
     // Selectable HTTP redirect types ([{ value, label }])
@@ -254,7 +256,7 @@ async function submit() {
                 <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-host">{{ __('Domain') }}</label>
                     <select id="mr-host" v-model="form.host" :class="inputClass" :disabled="shortLinksOnly" @change="hostTouched = true">
-                        <option v-if="!shortLinksOnly && canTypeBackHalf" value="">{{ __('Main site (404 redirect)') }}</option>
+                        <option v-if="!shortLinksOnly && canChooseAnyDomain" value="">{{ __('Main site (404 redirect)') }}</option>
                         <option v-for="host in hostOptions" :key="host" :value="host">{{ host }}</option>
                     </select>
                     <p class="mt-1 text-xs text-gray-500">

@@ -113,12 +113,15 @@ class ServiceProvider extends AddonServiceProvider
         Permission::group('redirects', 'Redirects', function (): void {
             Permission::register(MarketingRedirectController::PERMISSION)
                 ->label(__('Create marketing redirects'));
+            Permission::register(MarketingRedirectController::CUSTOM_PERMISSION)
+                ->label(__('Request custom vanity URLs'))
+                ->description(__('Request a vanity URL on a vanity domain with a back-half you choose, or one the system generates, and a tagged URL. Holding Create marketing redirects includes this.'));
             Permission::register(MarketingRedirectController::VANITY_PERMISSION)
                 ->label(__('Request vanity URLs'))
-                ->description(__('Request a vanity URL on a vanity domain, with a back-half the system generates, and a tagged URL. Holding Create marketing redirects includes this.'));
+                ->description(__('Request a vanity URL on a vanity domain, with a back-half the system generates, and a tagged URL. Holding Request custom vanity URLs or Create marketing redirects includes this.'));
             Permission::register(MarketingRedirectController::TAGGED_PERMISSION)
                 ->label(__('Request tagged URLs'))
-                ->description(__('Request a tagged URL through the marketing redirect form, without a vanity URL. Holding Create marketing redirects includes this.'));
+                ->description(__('Request a tagged URL through the marketing redirect form, without a vanity URL. Holding a vanity request permission or Create marketing redirects includes this.'));
             Permission::register(MarketingRedirectController::APPROVE_PERMISSION)
                 ->label(__('Approve marketing redirects'));
             Permission::register(MarketingRedirectController::SHORT_LINK_PERMISSION)
@@ -166,7 +169,7 @@ class ServiceProvider extends AddonServiceProvider
             }
 
             // Show the creation utility to users who can request redirects or tagged URLs, or make short links
-            if ($user->can(MarketingRedirectController::PERMISSION) || $user->can(MarketingRedirectController::VANITY_PERMISSION) || $user->can(MarketingRedirectController::TAGGED_PERMISSION) || $user->can(MarketingRedirectController::SHORT_LINK_PERMISSION)) {
+            if ($user->can(MarketingRedirectController::PERMISSION) || $user->can(MarketingRedirectController::CUSTOM_PERMISSION) || $user->can(MarketingRedirectController::VANITY_PERMISSION) || $user->can(MarketingRedirectController::TAGGED_PERMISSION) || $user->can(MarketingRedirectController::SHORT_LINK_PERMISSION)) {
                 /**
                  * @var \Statamic\CP\Navigation\Nav $nav
                  * @var NavItem $item

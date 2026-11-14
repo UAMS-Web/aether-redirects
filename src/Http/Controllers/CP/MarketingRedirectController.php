@@ -78,10 +78,18 @@ class MarketingRedirectController extends CpController
     /**
      * The permission required to request a vanity URL with a generated back-half (UAMS-Web/aether-redirects#12).
      *
-     * It includes the tagged URL level, and `PERMISSION`, which also types a back-half, includes it.
+     * It includes the tagged URL level, and `CUSTOM_PERMISSION` and `PERMISSION` include it.
      * Its holder asks for a vanity domain only and cannot type the source.
      */
     public const string VANITY_PERMISSION = 'request vanity urls';
+
+    /**
+     * The permission required to request a vanity URL with a back-half the requester types (UAMS-Web/aether-redirects#13).
+     *
+     * It includes the generated back-half level, and so the tagged URL one, and `PERMISSION` includes it.
+     * Its holder asks for a vanity domain only, and on each request either types the source or leaves it blank.
+     */
+    public const string CUSTOM_PERMISSION = 'request custom vanity urls';
 
     /**
      * The permission required to request a tagged URL alone (UAMS-Web/aether-redirects#11).
@@ -112,7 +120,7 @@ class MarketingRedirectController extends CpController
     public function create(): InertiaResponse
     {
         // Only staff who can request redirects, vanity URLs or tagged URLs, or make short links, may open the utility.
-        abort_unless(Gate::any([self::PERMISSION, self::VANITY_PERMISSION, self::TAGGED_PERMISSION, self::SHORT_LINK_PERMISSION]), 403);
+        abort_unless(Gate::any([self::PERMISSION, self::CUSTOM_PERMISSION, self::VANITY_PERMISSION, self::TAGGED_PERMISSION, self::SHORT_LINK_PERMISSION]), 403);
 
         // Hand the Vue screen its POST targets, the redirect-type options, the
         // domains a request can be made for and what this user may make.
@@ -122,8 +130,10 @@ class MarketingRedirectController extends CpController
             'hostOptions' => $this->hostOptions(),
             'canApprove' => $this->canApprove(),
             'canRequestVanity' => $this->canRequestVanity(),
-            // Only the widest level types a back-half; the generated level leaves the source blank (UAMS-Web/aether-redirects#12)
-            'canTypeBackHalf' => Gate::allows(self::PERMISSION),
+            // The generated level leaves the source blank; the custom level and the widest one may type it (UAMS-Web/aether-redirects#13)
+            'canTypeBackHalf' => $this->canTypeBackHalf(),
+            // Only the widest level may name the main site or a domain that is not a vanity domain
+            'canChooseAnyDomain' => Gate::allows(self::PERMISSION),
             'shortLinkHost' => Gate::allows(self::SHORT_LINK_PERMISSION) && ! $this->shortLinkHostError() instanceof JsonResponse ? ShortCode::HOST : null,
             'generatedHosts' => RedirectHosts::vanity(),
             // A tagged-only request needs the tagged URL permission, which the redirect permission includes (UAMS-Web/aether-redirects#11)
@@ -163,9 +173,9 @@ class MarketingRedirectController extends CpController
         // Gate the write behind a vanity request permission (UAMS-Web/aether-redirects#12).
         abort_unless($this->canRequestVanity(), 403);
 
-        // The generated level asks for a vanity domain and leaves the source for the system to draw.
+        // The narrower levels ask for a vanity domain, and the generated one leaves the source for the system to draw.
         if (! Gate::allows(self::PERMISSION)) {
-            $levelError = $this->generatedLevelError($request);
+            $levelError = $this->vanityLevelError($request);
 
             if ($levelError instanceof JsonResponse) {
                 return $levelError;
@@ -600,26 +610,37 @@ class MarketingRedirectController extends CpController
      */
     private function canRequestTagged(): bool
     {
-        return Gate::any([self::TAGGED_PERMISSION, self::VANITY_PERMISSION, self::PERMISSION]);
+        return Gate::any([self::TAGGED_PERMISSION, self::VANITY_PERMISSION, self::CUSTOM_PERMISSION, self::PERMISSION]);
     }
 
     /**
      * Whether the signed-in user may request a vanity URL (UAMS-Web/aether-redirects#12).
      *
-     * The generated level is enough, and the level that types a back-half includes it.
+     * The generated level is enough, and the custom level and the widest one include it.
      */
     private function canRequestVanity(): bool
     {
-        return Gate::any([self::VANITY_PERMISSION, self::PERMISSION]);
+        return Gate::any([self::VANITY_PERMISSION, self::CUSTOM_PERMISSION, self::PERMISSION]);
     }
 
     /**
-     * Refuse what the generated level may not ask for: a typed source, or a domain that is not a vanity domain.
+     * Whether the signed-in user may type the back-half of a vanity URL (UAMS-Web/aether-redirects#13).
+     *
+     * The custom level is enough, and the widest one includes it.
+     */
+    private function canTypeBackHalf(): bool
+    {
+        return Gate::any([self::CUSTOM_PERMISSION, self::PERMISSION]);
+    }
+
+    /**
+     * Refuse what a level below the widest may not ask for: a domain that is not a vanity domain,
+     * and, below the custom level, a typed source.
      *
      * @param  Request  $request  The incoming create request
      * @return JsonResponse|null A 422, or null when the request fits the level
      */
-    private function generatedLevelError(Request $request): ?JsonResponse
+    private function vanityLevelError(Request $request): ?JsonResponse
     {
         $host = $request->input('host');
 
@@ -630,7 +651,7 @@ class MarketingRedirectController extends CpController
         $source = $request->input('source');
 
         // A source of only spaces reaches here already trimmed to blank by the Control Panel's trim middleware
-        if (\is_string($source) && $source !== '') {
+        if (! $this->canTypeBackHalf() && \is_string($source) && $source !== '') {
             return $this->unprocessable('source', __('This access requests a generated back-half. Leave the source blank.'));
         }
 
@@ -1098,12 +1119,12 @@ class MarketingRedirectController extends CpController
     {
         $hosts = RedirectDomainList::hosts();
 
-        // The level that types a back-half may use every domain
+        // The widest level may use every domain
         if (Gate::allows(self::PERMISSION)) {
             return $hosts;
         }
 
-        // The generated level is offered the vanity domains, and a short-link maker its own domain (UAMS-Web/aether-redirects#12)
+        // The narrower levels are offered the vanity domains, and a short-link maker its own domain (UAMS-Web/aether-redirects#12)
         $allowed = Gate::allows(self::SHORT_LINK_PERMISSION) ? [...RedirectHosts::vanity(), ShortCode::HOST] : RedirectHosts::vanity();
 
         // Both sides are normalized host strings, which compare the same loosely or strictly
