@@ -146,6 +146,7 @@ class ServiceProvider extends AddonServiceProvider
                 Route::get('review', [MarketingRedirectController::class, 'index'])->name('review');
                 Route::post('{redirect}/approve', [MarketingRedirectController::class, 'approve'])->name('approve');
                 Route::post('{redirect}/reject', [MarketingRedirectController::class, 'reject'])->name('reject');
+                require __DIR__.'/../routes/marketing-qr.php';
             });
         });
     }

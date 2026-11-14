@@ -38,6 +38,20 @@ return [
     ],
 
     /*
+    | The files of a QR code made with a vanity URL (UAMS-Web/aether-redirects#14).
+    */
+    'qr' => [
+
+        // The handle of the asset container the SVG, PNG, PDF and EPS files are kept in. Null (the
+        // default) makes no files, so a request can still ask for a QR redirect but nothing can be downloaded.
+        'container' => null,
+
+        // The folder inside that container, without a leading or trailing slash, such as 'qr-codes'.
+        'folder' => 'qr-codes',
+
+    ],
+
+    /*
     | The Creative Services question on a redirect request (UAMS-Web/aether-redirects#25).
     |
     | Every request answers whether it involves Creative Services, and a "yes" needs a
