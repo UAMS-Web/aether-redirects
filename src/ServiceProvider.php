@@ -113,6 +113,9 @@ class ServiceProvider extends AddonServiceProvider
         Permission::group('redirects', 'Redirects', function (): void {
             Permission::register(MarketingRedirectController::PERMISSION)
                 ->label(__('Create marketing redirects'));
+            Permission::register(MarketingRedirectController::TAGGED_PERMISSION)
+                ->label(__('Request tagged URLs'))
+                ->description(__('Request a tagged URL through the marketing redirect form, without a vanity URL. Holding Create marketing redirects includes this.'));
             Permission::register(MarketingRedirectController::APPROVE_PERMISSION)
                 ->label(__('Approve marketing redirects'));
             Permission::register(MarketingRedirectController::SHORT_LINK_PERMISSION)
@@ -159,8 +162,8 @@ class ServiceProvider extends AddonServiceProvider
                 return;
             }
 
-            // Show the creation utility to users who can request redirects or make short links
-            if ($user->can(MarketingRedirectController::PERMISSION) || $user->can(MarketingRedirectController::SHORT_LINK_PERMISSION)) {
+            // Show the creation utility to users who can request redirects or tagged URLs, or make short links
+            if ($user->can(MarketingRedirectController::PERMISSION) || $user->can(MarketingRedirectController::TAGGED_PERMISSION) || $user->can(MarketingRedirectController::SHORT_LINK_PERMISSION)) {
                 /**
                  * @var \Statamic\CP\Navigation\Nav $nav
                  * @var NavItem $item
