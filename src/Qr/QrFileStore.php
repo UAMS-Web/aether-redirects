@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace UAMSWeb\Aether\Redirects\Qr;
 
 use Statamic\Assets\Asset;
+use Statamic\Assets\AssetContainer as ConcreteContainer;
 use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Facades\AssetContainer;
+use Statamic\Filesystem\AbstractAdapter;
 use UAMSWeb\Aether\Redirects\Services\QrPairFinder;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Support\QrRedirect;
@@ -47,8 +49,9 @@ final readonly class QrFileStore
     {
         $handle = config('aether-redirects.qr.container');
         $container = is_string($handle) ? AssetContainer::findByHandle($handle) : null;
+        $disk = $container instanceof ConcreteContainer ? $container->disk() : null;
 
-        if ($container === null) {
+        if (! is_string($handle) || ! $container instanceof ConcreteContainer || ! $disk instanceof AbstractAdapter) {
             return __('No asset container is set up for QR codes, so no files can be made.');
         }
 
@@ -66,17 +69,23 @@ final readonly class QrFileStore
 
         $ids = [];
 
+        $id = $vanity->id();
+        // A saved entry always has a string id; the empty fallback only satisfies the analyzer.
+        // @pest-mutate-ignore:EmptyStringToNotEmpty
+        $name = is_string($id) ? $id : '';
+
         foreach (self::writers() as $writer) {
-            $path = $directory.$vanity->id().'.'.$writer->extension();
+            $path = $directory.$name.'.'.$writer->extension();
 
-            $container->disk()->put($path, $writer->write($matrix));
-            $asset = $container->makeAsset($path);
-            $asset->save();
+            $disk->put($path, $writer->write($matrix));
+            $container->makeAsset($path)->save();
 
-            $ids[$writer->extension()] = $asset->id();
+            // An asset's id is its container handle and path.
+            $ids[$writer->extension()] = $handle.'::'.$path;
         }
 
-        $vanity->set(self::FIELD, $ids)->save();
+        $vanity->set(self::FIELD, $ids);
+        $vanity->save();
 
         return $ids;
     }

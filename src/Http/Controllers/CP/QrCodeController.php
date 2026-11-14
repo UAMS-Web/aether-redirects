@@ -93,7 +93,7 @@ final class QrCodeController extends CpController
     /**
      * The download links of the files made so far, by extension.
      *
-     * @return list<array{format: string, url: string}>
+     * @return list<array{format: string, url: mixed}>
      */
     private function fileLinks(string $redirect, QrFileStore $files, StatamicEntry $entry): array
     {

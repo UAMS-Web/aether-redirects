@@ -9,12 +9,14 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Assert;
+use Statamic\Assets\AssetContainer as ConcreteContainer;
 use Statamic\Auth\File\User as FileStatamicUser;
 use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Facades\Asset;
 use Statamic\Facades\AssetContainer;
 use Statamic\Facades\Entry;
 use Statamic\Facades\Stache;
+use Statamic\Filesystem\AbstractAdapter;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\QrCodeController;
 use UAMSWeb\Aether\Redirects\Qr\QrFileStore;
@@ -55,7 +57,35 @@ function qfsContainer(): void
     config()->set('filesystems.disks.qr_test', ['driver' => 'local', 'root' => $root]);
     config()->set('aether-redirects.qr.container', 'qr_codes');
 
-    AssetContainer::make('qr_codes')->disk('qr_test')->save();
+    $container = AssetContainer::make('qr_codes');
+
+    if (! $container instanceof ConcreteContainer) {
+        throw new RuntimeException('The asset container is not the concrete class.');
+    }
+
+    $container->disk('qr_test');
+    $container->save();
+}
+
+function qfsText(mixed $value): string
+{
+    if (! is_string($value) && ! is_numeric($value)) {
+        throw new RuntimeException('Expected text.');
+    }
+
+    return (string) $value;
+}
+
+function qfsDisk(string $handle): AbstractAdapter
+{
+    $container = AssetContainer::findByHandle($handle);
+    $disk = $container instanceof ConcreteContainer ? $container->disk() : null;
+
+    if (! $disk instanceof AbstractAdapter) {
+        throw new RuntimeException('The asset container has no disk.');
+    }
+
+    return $disk;
 }
 
 /**
@@ -76,7 +106,7 @@ function qfsVanity(string $source = '/flu'): StatamicEntry
 
     Assert::assertIsArray($saved);
 
-    return qfsEntry((string) $saved['vanity']['id']);
+    return qfsEntry(qfsText($saved['vanity']['id']));
 }
 
 function qfsEntry(string $id): StatamicEntry
@@ -104,7 +134,7 @@ function qfsBytes(StatamicEntry $vanity, string $extension): string
     $asset = Asset::find('qr_codes::qr-codes/'.qfsId($vanity).'.'.$extension);
     Assert::assertNotNull($asset);
 
-    return (string) $asset->contents();
+    return qfsText($asset->contents());
 }
 
 function qfsUser(): FileStatamicUser
@@ -133,7 +163,7 @@ it('makes the four files as assets, links them from the vanity redirect, and say
     ]);
 
     foreach ((array) $linked as $id) {
-        expect(Asset::find((string) $id))->not->toBeNull();
+        expect(Asset::find(qfsText($id)))->not->toBeNull();
     }
 });
 
@@ -147,7 +177,7 @@ it('encodes the QR URL and nothing else, in every file', function (): void {
     $png = tempnam(sys_get_temp_dir(), 'qr').'.png';
     file_put_contents($png, qfsBytes($vanity, 'png'));
 
-    expect((new QrReader($png))->text())->toBe('https://uams.info/flu-QR')
+    expect(new QrReader($png)->text())->toBe('https://uams.info/flu-QR')
         ->and(qrSvgModules(qfsBytes($vanity, 'svg')))->toBe(qrModulesOf($matrix))
         ->and(qrPdfModules(qfsBytes($vanity, 'pdf'), $matrix->total()))->toBe(qrModulesOf($matrix))
         ->and(qrEpsModules(qfsBytes($vanity, 'eps'), $matrix->total()))->toBe(qrModulesOf($matrix));
@@ -163,7 +193,8 @@ it('keeps the code when the destination is repointed, because it encodes the QR 
     $before = qfsBytes($vanity, 'svg');
 
     $entry = qfsEntry(qfsId($vanity));
-    $entry->set('target_url', 'https://www.uams.edu/clinics/moved')->save();
+    $entry->set('target_url', 'https://www.uams.edu/clinics/moved');
+    $entry->save();
 
     expect(qfsBytes($vanity, 'svg'))->toBe($before);
 });
@@ -177,7 +208,7 @@ it('makes the files again in place: the same assets, the same links, replaced co
 
     $asset = Asset::find('qr_codes::qr-codes/'.qfsId($vanity).'.svg');
     Assert::assertNotNull($asset);
-    $asset->disk()->put($asset->path(), 'damaged');
+    qfsDisk('qr_codes')->put('qr-codes/'.qfsId($vanity).'.svg', 'damaged');
 
     test()->postJson(mrdRoute('marketing-redirects.qr.generate', ['redirect' => qfsId($vanity)]))->assertOk();
 
@@ -242,6 +273,13 @@ it('makes nothing, and says why, when no container is set up', function (): void
     config()->set('aether-redirects.qr.container', 'missing');
 
     test()->postJson(mrdRoute('marketing-redirects.qr.generate', ['redirect' => qfsId($vanity)]))->assertUnprocessable();
+
+    config()->set('aether-redirects.qr.container', 'no_disk');
+    AssetContainer::make('no_disk')->save();
+
+    test()->postJson(mrdRoute('marketing-redirects.qr.generate', ['redirect' => qfsId($vanity)]))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'No asset container is set up for QR codes, so no files can be made.');
 });
 
 it('refuses a vanity redirect whose QR redirect is gone', function (): void {
@@ -268,7 +306,7 @@ it('is not found for a redirect with no QR code, an unknown id, or an entry outs
         host: 'uams.info',
     ));
 
-    test()->get(mrdRoute('marketing-redirects.qr', ['redirect' => (string) $plain['id']]))->assertNotFound();
+    test()->get(mrdRoute('marketing-redirects.qr', ['redirect' => qfsText($plain['id'])]))->assertNotFound();
     test()->get(mrdRoute('marketing-redirects.qr', ['redirect' => 'nope']))->assertNotFound();
     test()->postJson(mrdRoute('marketing-redirects.qr.generate', ['redirect' => 'nope']))->assertNotFound();
     test()->get(mrdRoute('marketing-redirects.qr.download', ['redirect' => 'nope', 'format' => 'svg']))->assertNotFound();
@@ -313,8 +351,7 @@ it('returns the ids of the files it made, and writes the metadata of each asset'
         'eps' => 'qr_codes::qr-codes/'.$id.'.eps',
     ]);
 
-    $disk = AssetContainer::findByHandle('qr_codes')?->disk();
-    Assert::assertNotNull($disk);
+    $disk = qfsDisk('qr_codes');
 
     foreach (['svg', 'png', 'pdf', 'eps'] as $extension) {
         expect($disk->exists('qr-codes/.meta/'.$id.'.'.$extension.'.yaml'))->toBeTrue();
@@ -343,7 +380,8 @@ it('makes nothing when the domain of the redirect cannot be resolved, or the QR 
 
     $companion = (new QrPairFinder)->companionOf($vanity);
     Assert::assertNotNull($companion);
-    $companion->set('source', null)->save();
+    $companion->set('source', null);
+    $companion->save();
 
     expect(app(QrFileStore::class)->generate(qfsEntry(qfsId($vanity))))->toBe('This redirect has no QR redirect, so there is no code to make.');
 
@@ -361,13 +399,16 @@ it('lists only the links that still reach an asset', function (): void {
     app(QrFileStore::class)->generate($vanity);
 
     $entry = qfsEntry(qfsId($vanity));
-    $entry->set('qr_files', ['svg' => 'qr_codes::missing.svg', 'png' => 12, 'pdf' => 'qr_codes::qr-codes/'.qfsId($vanity).'.pdf'])->save();
+    $entry->set('qr_files', ['svg' => 'qr_codes::missing.svg', 'png' => 12, 'pdf' => 'qr_codes::qr-codes/'.qfsId($vanity).'.pdf']);
+    $entry->save();
 
     $found = app(QrFileStore::class)->files(qfsEntry(qfsId($vanity)));
 
     expect(array_keys($found))->toBe(['pdf']);
 
-    qfsEntry(qfsId($vanity))->set('qr_files', 'not a list')->save();
+    $saved = qfsEntry(qfsId($vanity));
+    $saved->set('qr_files', 'not a list');
+    $saved->save();
 
     expect(app(QrFileStore::class)->files(qfsEntry(qfsId($vanity))))->toBe([]);
 });

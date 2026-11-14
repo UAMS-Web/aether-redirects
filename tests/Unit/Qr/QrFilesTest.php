@@ -60,7 +60,7 @@ function qrDecode(string $png): string|false
     file_put_contents($path, $png);
 
     try {
-        $text = (new QrReader($path))->text();
+        $text = new QrReader($path)->text();
 
         return is_string($text) ? $text : false;
     } finally {
@@ -157,6 +157,7 @@ it('does not decode a blank image, or a code with a finder pattern painted over'
     if (! $blank instanceof GdImage) {
         throw new RuntimeException('GD could not make the blank image.');
     }
+
     imagefill($blank, 0, 0, (int) imagecolorallocate($blank, 255, 255, 255));
     ob_start();
     imagepng($blank);
