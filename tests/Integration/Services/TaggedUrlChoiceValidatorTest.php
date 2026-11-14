@@ -44,9 +44,9 @@ function tcvErrors(array $input): array
 {
     try {
         tcvValidate($input);
-    } catch (ValidationException $exception) {
+    } catch (ValidationException $validationException) {
         /** @var array<string, list<string>> $errors */
-        $errors = $exception->errors();
+        $errors = $validationException->errors();
 
         return $errors;
     }
