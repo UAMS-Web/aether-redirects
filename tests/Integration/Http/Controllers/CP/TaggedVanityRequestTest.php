@@ -267,8 +267,11 @@ it('issues a main-site request its tagged destination at approval and keeps it',
 
     $pending = app(MarketingRedirectStore::class)->find($id);
 
+    $kept = $pending['tagged_choices'] ?? null;
+    Assert::assertIsArray($kept);
+
     expect($pending['target_url'] ?? null)->toBe('https://www.uams.edu/clinics/flu')
-        ->and($pending['tagged_choices']['channel'] ?? null)->toBe('ch-social');
+        ->and($kept['channel'] ?? null)->toBe('ch-social');
 
     tvApprove($id)->assertOk();
 
