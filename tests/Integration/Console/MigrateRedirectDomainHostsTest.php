@@ -103,7 +103,7 @@ it('creates one record per distinct host and rewrites every entry to its record'
     $c = legacyDomainEntry('uams.info', '/c');
 
     expect(Artisan::call('redirects:migrate-domain-hosts'))->toBe(0)
-        ->and(Artisan::output())->toBe("2 domain record(s) created, 3 entries rewritten, 0 skipped.\n");
+        ->and(consoleOutput())->toBe("2 domain record(s) created, 3 entries rewritten, 0 skipped.\n");
 
     RedirectDomainRecords::reload();
 
@@ -144,7 +144,7 @@ it('changes nothing when it runs twice', function (): void {
     $stored = migrateStoredHosts();
 
     expect(Artisan::call('redirects:migrate-domain-hosts'))->toBe(0)
-        ->and(Artisan::output())->toContain('0 domain record(s) created, 0 entries rewritten, 0 skipped.')
+        ->and(consoleOutput())->toContain('0 domain record(s) created, 0 entries rewritten, 0 skipped.')
         ->and(RedirectDomainList::records())->toBe($records)
         ->and(migrateStoredHosts())->toBe($stored);
 });
@@ -157,7 +157,7 @@ it('reuses a record the list already holds', function (): void {
 
     expect(array_keys(RedirectDomainList::records()))->toBe([$existing])
         ->and(RedirectDomainRecords::stored($entry, 'host'))->toBe($existing)
-        ->and(Artisan::output())->toContain('0 domain record(s) created, 1 entry rewritten');
+        ->and(consoleOutput())->toContain('0 domain record(s) created, 1 entry rewritten');
 });
 
 it('reports an entry whose host is not a valid domain and leaves it as it is', function (mixed $host): void {
@@ -165,7 +165,7 @@ it('reports an entry whose host is not a valid domain and leaves it as it is', f
 
     expect(Artisan::call('redirects:migrate-domain-hosts'))->toBe(0);
 
-    $output = Artisan::output();
+    $output = consoleOutput();
 
     expect($output)->toContain('Entry '.RedirectDomainRecords::id($entry).' has a host that is not a valid domain')
         ->and($output)->toContain('0 domain record(s) created, 0 entries rewritten, 1 skipped.')
@@ -180,7 +180,7 @@ it('reports what it would do on a dry run and changes nothing', function (): voi
     $entry = legacyDomainEntry('agec.org', '/a');
 
     expect(Artisan::call('redirects:migrate-domain-hosts', ['--dry-run' => true]))->toBe(0)
-        ->and(Artisan::output())->toContain('Dry run: 1 domain record(s) created, 1 entry rewritten, 0 skipped.')
+        ->and(consoleOutput())->toContain('Dry run: 1 domain record(s) created, 1 entry rewritten, 0 skipped.')
         ->and(RedirectDomainList::records())->toBe([])
         ->and(RedirectDomainRecords::stored($entry, 'host'))->toBe('agec.org');
 });
@@ -196,7 +196,7 @@ it('migrates the entries after one that is already migrated', function (): void 
 
     $records = RedirectDomainList::records();
 
-    expect(Artisan::output())->toBe("1 domain record(s) created, 2 entries rewritten, 0 skipped.\n")
+    expect(consoleOutput())->toBe("1 domain record(s) created, 2 entries rewritten, 0 skipped.\n")
         ->and($records[RedirectDomainRecords::storedHost($migrated)])->toBe('agec.org')
         ->and($records[RedirectDomainRecords::storedHost($first)])->toBe('agec.org')
         ->and($records[RedirectDomainRecords::storedHost($second)])->toBe('uams.info');

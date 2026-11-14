@@ -82,7 +82,7 @@ it('names each source written in more than one case on a host, and fails', funct
 
     expect(Artisan::call('redirects:report-case-duplicates'))->toBe(1);
 
-    $output = Artisan::output();
+    $output = consoleOutput();
 
     expect($output)->toContain("uams.health: /aB3xY9q, /AB3XY9Q, /ab3xy9q\n")
         ->and($output)->toContain("uams.info: /Flu, /flu\n")
@@ -95,7 +95,7 @@ it('succeeds when no two sources differ only in case', function (): void {
     caseDupRule('uams.health', '/two');
 
     expect(Artisan::call('redirects:report-case-duplicates'))->toBe(0)
-        ->and(Artisan::output())->toBe("No two sources differ only in case.\n");
+        ->and(consoleOutput())->toBe("No two sources differ only in case.\n");
 });
 
 it('does not count a pair that spells the source the same, or the same spelling on two hosts', function (): void {
@@ -151,5 +151,5 @@ it('keeps looking after a rule it leaves out', function (): void {
     caseDupRule('uams.health', '/flu');
 
     expect(Artisan::call('redirects:report-case-duplicates'))->toBe(1)
-        ->and(Artisan::output())->toContain("uams.health: /Flu, /flu\n");
+        ->and(consoleOutput())->toContain("uams.health: /Flu, /flu\n");
 });
