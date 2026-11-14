@@ -60,8 +60,8 @@
         "pestphp/pest": "^5.3",
         "pestphp/pest-plugin-phpstan": "^5.2",
         "rector/rector": "^2.7",
-        "uams-web/patches-orchestra-testbench-core": "^1.0",
-        "uams-web/patches-pest-plugin-mutate": "^1.0"
+        "uams-web/patches-orchestra-testbench-core": "^1.1",
+        "uams-web/patches-pest-plugin-mutate": "^1.4"
     },
     "repositories": [
         {

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7f3329b086ef7de4199f8afc5c154b80",
+    "content-hash": "653c88883e42423c147cc2939a88b9cd",
     "packages": [
         {
             "name": "ajthinking/archetype",
@@ -13760,26 +13760,31 @@
         },
         {
             "name": "uams-web/patches-orchestra-testbench-core",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/UAMS-Web/patches-orchestra-testbench-core.git",
-                "reference": "a2e4cbf20079a8231c1435477ce4ac00135f75c9"
+                "reference": "c38baffd1664dcba43d6baf67cc22e038a706472"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/UAMS-Web/patches-orchestra-testbench-core/zipball/a2e4cbf20079a8231c1435477ce4ac00135f75c9",
-                "reference": "a2e4cbf20079a8231c1435477ce4ac00135f75c9",
+                "url": "https://api.github.com/repos/UAMS-Web/patches-orchestra-testbench-core/zipball/c38baffd1664dcba43d6baf67cc22e038a706472",
+                "reference": "c38baffd1664dcba43d6baf67cc22e038a706472",
                 "shasum": ""
             },
             "require": {
+                "laravel/framework": "^13.42.0",
                 "orchestra/testbench-core": "11.6.0"
             },
             "type": "library",
             "extra": {
                 "patches": {
                     "orchestra/testbench-core": {
-                        "Give each parallel test worker its own service manifest (temporary; see UAMS-Web/patches-orchestra-testbench-core#1)": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-services-manifest.patch"
+                        "Give each parallel test worker its own service manifest (temporary; see UAMS-Web/patches-orchestra-testbench-core#1)": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-services-manifest.patch",
+                        "Give each parallel test worker its own package manifest under Pest (temporary; see UAMS-Web/patches-orchestra-testbench-core#5)": "vendor/uams-web/patches-orchestra-testbench-core/patches/testbench-parallel-packages-manifest.patch"
+                    },
+                    "laravel/framework": {
+                        "Tolerate a lost facade stub rename on Windows (temporary; see UAMS-Web/patches-orchestra-testbench-core#6)": "vendor/uams-web/patches-orchestra-testbench-core/patches/laravel-facade-stub-rename.patch"
                     }
                 }
             },
@@ -13796,20 +13801,20 @@
                 "issues": "https://github.com/UAMS-Web/patches-orchestra-testbench-core/issues",
                 "source": "https://github.com/UAMS-Web/patches-orchestra-testbench-core"
             },
-            "time": "2026-11-11T23:07:21+00:00"
+            "time": "2026-11-13T20:06:04+00:00"
         },
         {
             "name": "uams-web/patches-pest-plugin-mutate",
-            "version": "v1.0.0",
+            "version": "v1.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/UAMS-Web/patches-pest-plugin-mutate.git",
-                "reference": "26ea5f32f1515a5cc8ef9067e63661722745eaa6"
+                "reference": "6091433589d65c8741c409d37066aa137641dc91"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/UAMS-Web/patches-pest-plugin-mutate/zipball/26ea5f32f1515a5cc8ef9067e63661722745eaa6",
-                "reference": "26ea5f32f1515a5cc8ef9067e63661722745eaa6",
+                "url": "https://api.github.com/repos/UAMS-Web/patches-pest-plugin-mutate/zipball/6091433589d65c8741c409d37066aa137641dc91",
+                "reference": "6091433589d65c8741c409d37066aa137641dc91",
                 "shasum": ""
             },
             "require": {
@@ -13819,17 +13824,23 @@
             "extra": {
                 "patches": {
                     "pestphp/pest-plugin-mutate": {
-                        "Let a mutant child on Windows run its tests and write files, so its failure is a real kill (temporary; see #2524)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-windows-mutant-child.patch",
-                        "Stop three silent @pest-mutate-ignore parsing defects suppressing nothing or the wrong set (temporary; see #2327)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-annotation-parsing.patch",
                         "Launch each mutant child process so a run cannot score every mutant killed without executing one (temporary; see #2322)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-mutant-process-launch.patch",
+                        "Stop three silent @pest-mutate-ignore parsing defects suppressing nothing or the wrong set (temporary; see #2327)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-annotation-parsing.patch",
+                        "Let a mutant child on Windows run its tests and write files, so its failure is a real kill (temporary; see #2524)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-windows-mutant-child.patch",
                         "Drop the run's own --filter from each mutant child so a filtered run cannot score every mutant killed (temporary; see #2570)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-drop-run-filter.patch",
+                        "Widen or refuse a mutant child's filter that PCRE cannot compile, or that would pass cmd.exe's command-line limit on Windows, so it cannot score a kill without running a test (temporary; see #2578, #3114)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-windows-filter-length.patch",
                         "Create the mutations directory and fail on a mutated source that cannot be written, so a run cannot score mutants it never applied (temporary; see #2812)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-write-mutated-source.patch",
                         "Drop the parallel runner's options (--passthru-php, --processes and the rest) from each mutant child so a parallel run given one cannot score every mutant killed (temporary; see #2926, #2947)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-drop-parallel-runner-options.patch",
-                        "Widen or refuse a mutant child's filter that PCRE cannot compile, or that would pass cmd.exe's command-line limit on Windows, so it cannot score a kill without running a test (temporary; see #2578, #3114)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-windows-filter-length.patch"
+                        "Select tests for a mutated scalar function default, so it is not scored without a test running it (temporary; see UAMS-Web/uams-2020#673)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-function-defaults.patch",
+                        "Propagate a mutation into isolated test processes and reject a test report that ran no tests, so an isolated run cannot score a mutant killed without running a test (temporary; see UAMS-Web/UAMSWP-Logo-List#82)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-isolated-processes.patch",
+                        "Map a class constant mutant to the tests covering its containing class, since a constant initializer has no executable coverage line (temporary)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-class-constant-coverage.patch",
+                        "Skip a node whose own comment carries a matching @pest-mutate-ignore marker, including when the traverser still leaves that node (temporary)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-ignore-annotated-statement.patch",
+                        "Size a mutant child's time limit from the serial work the initial suite stands for, so a --parallel run cannot score a mutant a timeout that no test caused (temporary; see UAMS-Web/patches-pest-plugin-mutate#2)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-mutant-timeout.patch",
+                        "Keep Patchwork in front of the mutation stream wrapper after a pass-through read, so a function a test mocks is still redefined in a mutant child that logs to junit (temporary; see UAMS-Web/patches-pest-plugin-mutate#31)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-stream-wrapper-patchwork.patch",
+                        "Run a mutant child again when it times out once, and score a timeout only when the second attempt times out too, so a transient slowdown of the machine cannot keep --min=100 out of reach (temporary; see UAMS-Web/patches-pest-plugin-mutate#30)": "vendor/uams-web/patches-pest-plugin-mutate/patches/pest-plugin-mutate-mutant-timeout-retry.patch"
                     }
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -13844,7 +13855,7 @@
                 "issues": "https://github.com/UAMS-Web/patches-pest-plugin-mutate/issues",
                 "source": "https://github.com/UAMS-Web/patches-pest-plugin-mutate"
             },
-            "time": "2026-11-10T21:43:23+00:00"
+            "time": "2026-11-14T04:35:19+00:00"
         }
     ],
     "aliases": [],
