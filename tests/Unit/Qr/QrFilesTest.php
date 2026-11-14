@@ -37,6 +37,19 @@ function qrSide(string $png): int
     return imagesx(qrImage($png));
 }
 
+/**
+ * The red, green and blue of one pixel.
+ *
+ * @return array{red: int, green: int, blue: int, alpha: int}
+ */
+function qrPixel(GdImage $image, int $x, int $y): array
+{
+    $index = imagecolorat($image, $x, $y);
+    assert(is_int($index));
+
+    return imagecolorsforindex($image, $index);
+}
+
 function qrDecode(string $png): string|false
 {
     $path = tempnam(sys_get_temp_dir(), 'qr').'.png';
@@ -91,9 +104,9 @@ it('writes the PNG at least 1,000 pixels square, with whole pixels per module, b
         ->and($side % 37)->toBe(0)
         ->and(PngWriter::MINIMUM_PIXELS)->toBe(1000);
 
-    $corner = imagecolorsforindex($image, imagecolorat($image, 0, 0));
-    $far = imagecolorsforindex($image, imagecolorat($image, $side - 1, $side - 1));
-    $finder = imagecolorsforindex($image, imagecolorat($image, 4 * $unit + 1, 4 * $unit + 1));
+    $corner = qrPixel($image, 0, 0);
+    $far = qrPixel($image, $side - 1, $side - 1);
+    $finder = qrPixel($image, 4 * $unit + 1, 4 * $unit + 1);
 
     // The quiet zone is white and the first finder module is black
     expect($corner)->toMatchArray(['red' => 255, 'green' => 255, 'blue' => 255])
