@@ -24,13 +24,28 @@ const QR_URL = 'https://uams.health/v6qzl2N-QR';
 /**
  * Decode PNG bytes with the dev decoder; false when no code is found.
  */
+function qrImage(string $png): GdImage
+{
+    $image = imagecreatefromstring($png);
+    assert($image instanceof GdImage);
+
+    return $image;
+}
+
+function qrSide(string $png): int
+{
+    return imagesx(qrImage($png));
+}
+
 function qrDecode(string $png): string|false
 {
     $path = tempnam(sys_get_temp_dir(), 'qr').'.png';
     file_put_contents($path, $png);
 
     try {
-        return (new QrReader($path))->text();
+        $text = (new QrReader($path))->text();
+
+        return is_string($text) ? $text : false;
     } finally {
         unlink($path);
     }
@@ -67,41 +82,42 @@ it('scans the PNG back to the QR URL, and nothing else', function (): void {
 
 it('writes the PNG at least 1,000 pixels square, with whole pixels per module, black on white', function (): void {
     $png = (new PngWriter)->write(QrMatrix::encode(QR_URL));
-    $info = getimagesizefromstring($png);
+    $image = qrImage($png);
+    $side = qrSide($png);
+    $unit = intdiv($side, 37);
 
-    expect($info)->not->toBeFalse()
-        ->and($info[0])->toBe($info[1])
-        ->and($info[0])->toBeGreaterThanOrEqual(1000)
-        ->and($info[0] % 37)->toBe(0)
+    expect(imagesy($image))->toBe($side)
+        ->and($side)->toBeGreaterThanOrEqual(1000)
+        ->and($side % 37)->toBe(0)
         ->and(PngWriter::MINIMUM_PIXELS)->toBe(1000);
 
-    $image = imagecreatefromstring($png);
-    expect($image)->not->toBeFalse();
+    $corner = imagecolorsforindex($image, imagecolorat($image, 0, 0));
+    $far = imagecolorsforindex($image, imagecolorat($image, $side - 1, $side - 1));
+    $finder = imagecolorsforindex($image, imagecolorat($image, 4 * $unit + 1, 4 * $unit + 1));
 
     // The quiet zone is white and the first finder module is black
-    expect(imagecolorat($image, 0, 0))->toBe(imagecolorat($image, $info[0] - 1, $info[1] - 1))
-        ->and(imagecolorsforindex($image, imagecolorat($image, 0, 0)))->toMatchArray(['red' => 255, 'green' => 255, 'blue' => 255])
-        ->and(imagecolorsforindex($image, imagecolorat($image, 4 * intdiv($info[0], 37) + 1, 4 * intdiv($info[0], 37) + 1)))->toMatchArray(['red' => 0, 'green' => 0, 'blue' => 0]);
+    expect($corner)->toMatchArray(['red' => 255, 'green' => 255, 'blue' => 255])
+        ->and($far)->toMatchArray(['red' => 255, 'green' => 255, 'blue' => 255])
+        ->and($finder)->toMatchArray(['red' => 0, 'green' => 0, 'blue' => 0]);
 });
 
 it('does not decode a blank image, or a code with a finder pattern painted over', function (): void {
     $png = (new PngWriter)->write(QrMatrix::encode(QR_URL));
-    $image = imagecreatefromstring($png);
-    expect($image)->not->toBeFalse();
-
-    $white = imagecolorallocate($image, 255, 255, 255);
-    $unit = intdiv((int) getimagesizefromstring($png)[0], 37);
+    $image = qrImage($png);
+    $unit = intdiv(qrSide($png), 37);
+    $white = (int) imagecolorallocate($image, 255, 255, 255);
 
     // Blank
     $blank = imagecreatetruecolor(1036, 1036);
+    assert($blank instanceof GdImage);
     imagefill($blank, 0, 0, (int) imagecolorallocate($blank, 255, 255, 255));
     ob_start();
     imagepng($blank);
     $blankPng = (string) ob_get_clean();
 
     // Two of the three finder patterns painted out
-    imagefilledrectangle($image, 4 * $unit, 4 * $unit, 11 * $unit, 11 * $unit, (int) $white);
-    imagefilledrectangle($image, 26 * $unit, 4 * $unit, 33 * $unit, 11 * $unit, (int) $white);
+    imagefilledrectangle($image, 4 * $unit, 4 * $unit, 11 * $unit, 11 * $unit, $white);
+    imagefilledrectangle($image, 26 * $unit, 4 * $unit, 33 * $unit, 11 * $unit, $white);
     ob_start();
     imagepng($image);
     $alteredPng = (string) ob_get_clean();

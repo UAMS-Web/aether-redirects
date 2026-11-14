@@ -27,7 +27,7 @@ final class PngWriter implements QrWriter
     {
         $total = $matrix->total();
         $unit = intdiv(self::MINIMUM_PIXELS + $total - 1, $total);
-        $side = $total * $unit;
+        $side = max(1, $total * $unit);
 
         $image = imagecreate($side, $side);
 

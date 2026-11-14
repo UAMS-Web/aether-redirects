@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UAMSWeb\Aether\Redirects\Qr;
 
 use FPDF;
+use RuntimeException;
 
 /**
  * The print master: a one-page PDF of vector squares, one per dark module (UAMS-Web/aether-redirects#14).
@@ -39,6 +40,12 @@ final class PdfWriter implements QrWriter
             $pdf->Rect($x * self::UNIT, $y * self::UNIT, self::UNIT, self::UNIT, 'F');
         }
 
-        return $pdf->Output('S');
+        $document = $pdf->Output('S');
+
+        if (! is_string($document)) {
+            throw new RuntimeException('FPDF did not return the document.');
+        }
+
+        return $document;
     }
 }
