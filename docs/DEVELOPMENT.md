@@ -58,11 +58,14 @@ Then request `/cp/addons` as a super user, in a browser or in process, and confi
 
 ## Testing the Control Panel pages
 
-`npm run test:scripts` runs Vitest over two groups: the guard scripts under `scripts/`, and the Control Panel pages under `tests/js/`. A page test mounts the real single-file component with `@vue/test-utils` in jsdom (the file opts in with `// @vitest-environment jsdom`) and needs no host and no Control Panel.
+`npm run test:scripts` runs Vitest in two projects (`vitest.config.js`): `scripts`, the guard scripts under `scripts/`, on node; and `pages`, the Control Panel pages, whose tests are under `tests/js/`, in jsdom. A page test mounts the real single-file component with `@vue/test-utils` and needs no host and no Control Panel. The setup follows the synced `testing-statamic-cp-components` skill: `jsdom` `^29.1.1` and `vue` `^3.5.43` are the versions it pins.
 
-`vitest.config.js` adds `@vitejs/plugin-vue` so the page compiles, and aliases `@statamic/cms/inertia` and `@statamic/cms/ui` to the stand-ins in `tests/js/stubs/`, because the real ones need the booted Control Panel. A test supplies `__` and `$axios` through `global.config.globalProperties`, which is where Statamic provides them; `global.mocks` does not reach the instance proxy the pages read them from.
+- `resources/js/testing/statamic-stubs-plugin.js` replaces `@statamic/cms` and `@statamic/cms/ui` with modules generated from the names the sources under `resources/js` import, and `resources/js/testing/statamic-harness.js` holds the stand-ins. An import with no stand-in fails the suite and names it: add one with `stubUi()` in the harness's list. Both files are copies of the skill's templates; `Header` and `Panel` are this add-on's additions to the harness's UI list.
+- The plugin resolves those two entries only. The pages also import `Head` from `@statamic/cms/inertia`, which `vitest.config.js` aliases to `tests/js/stubs/inertia.js`.
+- A test supplies `__` and `$axios` through `global.config.globalProperties`, which is where Statamic provides them; `global.mocks` does not reach the instance proxy the pages read them from.
+- `vue()` from `@vitejs/plugin-vue` compiles the pages here, not the `statamic()` plugin, which rewrites `vue` to `window.Vue`.
 
-`tests/js/MarketingRedirectCreate.test.js` covers the request form's submitted payload for a tagged request (blanks left out; steps, lists, custom values and request fields keyed as the validator reads them), how often it asks the cascade endpoint, and the three plain fields a site with no lookup data sees. A host with real lookup data and a browser is still the way to look at the layout; the tests cover what the page sends and shows.
+`tests/js/MarketingRedirectCreate.test.js` covers the request form's submitted payload for a tagged request (blanks left out; steps, lists, custom values and request fields keyed as the validator reads them), how often it asks the cascade endpoint, and the three plain fields a site with no lookup data sees. The stand-ins pin what the page sends and shows, not how Statamic renders its own components; a host with real lookup data and a browser is still the way to look at the layout.
 
 ## Editions can be added later
 
