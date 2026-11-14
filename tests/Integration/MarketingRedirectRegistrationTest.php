@@ -187,6 +187,15 @@ it('shows the creation utility to a user who can request only generated vanity U
         ->and($items)->not->toHaveKey('Review Redirects');
 });
 
+it('shows the creation utility to a user who can request only custom vanity URLs', function (): void {
+    marketingRedirectRegistrationSignIn([MarketingRedirectController::CUSTOM_VANITY_PERMISSION]);
+
+    $items = marketingRedirectRegistrationNavItems();
+
+    expect($items)->toHaveKey('Marketing Redirects')
+        ->and($items)->not->toHaveKey('Review Redirects');
+});
+
 it('registers the tagged URL permission with a label and a description', function (): void {
     $permission = Permission::get(MarketingRedirectController::TAGGED_PERMISSION);
 
