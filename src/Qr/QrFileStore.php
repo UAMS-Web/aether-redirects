@@ -49,9 +49,14 @@ final readonly class QrFileStore
     {
         $handle = config('aether-redirects.qr.container');
         $container = is_string($handle) ? AssetContainer::findByHandle($handle) : null;
-        $disk = $container instanceof ConcreteContainer ? $container->disk() : null;
 
-        if (! is_string($handle) || ! $container instanceof ConcreteContainer || ! $disk instanceof AbstractAdapter) {
+        if (! $container instanceof ConcreteContainer) {
+            return __('No asset container is set up for QR codes, so no files can be made.');
+        }
+
+        $disk = $container->disk();
+
+        if (! $disk instanceof AbstractAdapter) {
             return __('No asset container is set up for QR codes, so no files can be made.');
         }
 
@@ -81,7 +86,7 @@ final readonly class QrFileStore
             $container->makeAsset($path)->save();
 
             // An asset's id is its container handle and path.
-            $ids[$writer->extension()] = $handle.'::'.$path;
+            $ids[$writer->extension()] = sprintf('%s::%s', $container->handle(), $path);
         }
 
         $vanity->set(self::FIELD, $ids);
