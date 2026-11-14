@@ -12,6 +12,7 @@ The pages in this folder are skeletons, one per page shape the `github-wiki` ski
 ## Guides
 
 - [Task guide](Task-guide.md): one task, the steps, and the reference it used.
+- [Setting up tagged URL lists](Setting-up-tagged-URL-lists.md): the lookup lists, the cascade and the parameters a tagged URL carries.
 
 ## Troubleshooting
 

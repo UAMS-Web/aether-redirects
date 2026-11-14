@@ -8,6 +8,7 @@
 **Guides**
 
 - [Task guide](Task-guide.md)
+- [Setting up tagged URL lists](Setting-up-tagged-URL-lists.md)
 
 **Troubleshooting**
 
