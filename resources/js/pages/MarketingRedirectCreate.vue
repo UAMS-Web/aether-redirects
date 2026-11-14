@@ -233,9 +233,11 @@ async function loadCascade() {
     }
 }
 
-// A choice at the channel, a step or a list narrows what follows.
+// A choice at the channel, a step or a list narrows what follows. The source is one string, so
+// storing the same choices again (as an answer that clears nothing does) is not a change and
+// does not ask the endpoint again.
 watch(
-    () => [form.value.channel, JSON.stringify(form.value.steps), JSON.stringify(form.value.lists)],
+    () => JSON.stringify([form.value.channel, form.value.steps, form.value.lists]),
     () => {
         if (form.value.kind === 'tagged') {
             loadCascade();

@@ -56,6 +56,14 @@ Then request `/cp/addons` as a super user, in a browser or in process, and confi
 
 `npm run build` writes the production build to `resources/dist`, which is committed. In the host, `php artisan vendor:publish --tag=aether-redirects --force` copies `resources/dist/build` to `public/vendor/aether-redirects/build`, and `statamic:install` does the same after a `composer update`. After publishing, the `/cp/addons` page references the built `cp-<hash>.js` and `cp-<hash>.css` under `/vendor/aether-redirects/build/assets/`. `npm ci` needs `vendor/statamic/cms`, because `@statamic/cms` is a `file:` link into it, so run `composer install` first.
 
+## Testing the Control Panel pages
+
+`npm run test:scripts` runs Vitest over two groups: the guard scripts under `scripts/`, and the Control Panel pages under `tests/js/`. A page test mounts the real single-file component with `@vue/test-utils` in jsdom (the file opts in with `// @vitest-environment jsdom`) and needs no host and no Control Panel.
+
+`vitest.config.js` adds `@vitejs/plugin-vue` so the page compiles, and aliases `@statamic/cms/inertia` and `@statamic/cms/ui` to the stand-ins in `tests/js/stubs/`, because the real ones need the booted Control Panel. A test supplies `__` and `$axios` through `global.config.globalProperties`, which is where Statamic provides them; `global.mocks` does not reach the instance proxy the pages read them from.
+
+`tests/js/MarketingRedirectCreate.test.js` covers the request form's submitted payload for a tagged request (blanks left out; steps, lists, custom values and request fields keyed as the validator reads them), how often it asks the cascade endpoint, and the three plain fields a site with no lookup data sees. A host with real lookup data and a browser is still the way to look at the layout; the tests cover what the page sends and shows.
+
 ## Editions can be added later
 
 An add-on declares no editions by default. Whether it can gain `["free", "pro"]` after a public tag without disturbing installs was measured in a host by pointing the path repository at a copy of an add-on without editions and then at one with `extra.statamic.editions` set to `["free", "pro"]`, each followed by `composer update` and a read of `Addon::get('<package>')`.
