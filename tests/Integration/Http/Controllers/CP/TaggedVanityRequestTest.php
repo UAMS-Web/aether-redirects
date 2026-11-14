@@ -15,6 +15,7 @@ use Statamic\Facades\Stache;
 use Statamic\Globals\GlobalSet as StatamicGlobalSet;
 use Symfony\Component\HttpFoundation\Response;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
+use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\TaggedVanityIssuer;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
@@ -254,4 +255,25 @@ it('keeps each side of a tagged pair as issued when the vanity redirect is saved
 
     expect(tvStored($qr, 'target_url'))->toBe($issued)
         ->and($issued)->toContain('utm_qr=true');
+});
+
+it('issues a main-site request its tagged destination at approval and keeps it', function (): void {
+    $response = mrdSubmit(mrdCreator(), ['host' => '', 'source' => '/old-page', 'channel' => 'ch-social', 'steps' => ['source' => 'src-facebook']]);
+
+    $response->assertCreated();
+
+    $id = $response->json('redirect.id');
+    Assert::assertIsString($id);
+
+    $pending = app(MarketingRedirectStore::class)->find($id);
+
+    expect($pending['target_url'] ?? null)->toBe('https://www.uams.edu/clinics/flu')
+        ->and($pending['tagged_choices']['channel'] ?? null)->toBe('ch-social');
+
+    tvApprove($id)->assertOk();
+
+    $issued = app(MarketingRedirectStore::class)->find($id)['target_url'] ?? null;
+
+    expect(tvQuery($issued))->toContain('utm_source=facebook')
+        ->and(tvQuery($issued))->not->toContain('utm_vanity=');
 });
