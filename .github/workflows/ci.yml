@@ -59,10 +59,12 @@ permissions:
 jobs:
   # The shared chain.
   checks:
-    uses: UAMS-Web/uams-ci-workflows/.github/workflows/ci.yml@v0.9.0
+    uses: UAMS-Web/uams-ci-workflows/.github/workflows/ci.yml@v0.13.0
     with:
       linux-only: true
       mutate-paths: src
+      # The changed-file mutation run for a large change outlasts the 45-minute default (UAMS-Web/aether-redirects#125).
+      mutate-timeout-minutes: 240
 
   # The chain checks the emoji sweep; it does not check the decision log.
   decision-log:
