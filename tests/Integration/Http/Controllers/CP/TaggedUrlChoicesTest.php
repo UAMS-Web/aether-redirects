@@ -292,3 +292,37 @@ it('shows a pending request with the fields it was saved with', function (): voi
     test()->get(mrdRoute('marketing-redirects.review'))
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('redirects.0.fields', ['utm_campaign' => 'flu-2026', 'vanity_path' => '/flu']));
 });
+
+it('shows a pending request with each choice named for what it is for, and the custom value beside it', function (): void {
+    tcSubmit(mrdCreator(), tcChoices())->assertCreated();
+
+    test()->actingAs(mrdApprover());
+    test()->get(mrdRoute('marketing-redirects.review'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('redirects.0.choices', [
+            ['name' => 'channel', 'option' => 'Social', 'custom' => null],
+            ['name' => 'source', 'option' => 'Facebook', 'custom' => null],
+            ['name' => 'medium', 'option' => 'Feed', 'custom' => null],
+            ['name' => 'audience', 'option' => 'Staff', 'custom' => 'Extra'],
+        ]));
+});
+
+it('shows the id of a choice whose option has since been removed, and no choices for a request made with none', function (): void {
+    $id = tcId(tcSubmit(mrdCreator(), ['channel' => 'ch-social']));
+    tcSubmit(mrdCreator())->assertCreated();
+
+    Entry::find('ch-social')?->delete();
+
+    test()->actingAs(mrdApprover());
+    test()->get(mrdRoute('marketing-redirects.review'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('redirects.0.id', $id)
+            ->where('redirects.0.choices', [['name' => 'channel', 'option' => 'ch-social', 'custom' => null]])
+            ->where('redirects.1.choices', []));
+});
+
+it('gives the form the endpoint that offers the options at each step', function (): void {
+    test()->actingAs(mrdCreator());
+
+    test()->get(mrdRoute('marketing-redirects.create'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('cascadeUrl', mrdRoute('marketing-redirects.tagged-url.cascade')));
+});

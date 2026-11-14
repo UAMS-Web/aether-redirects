@@ -140,6 +140,8 @@ class MarketingRedirectController extends CpController
             'generatedHosts' => RedirectHosts::vanity(),
             // A tagged-only request needs the tagged URL permission, which the redirect permission includes (UAMS-Web/aether-redirects#11)
             'taggedAvailable' => $this->canRequestTagged() && TaggedUrlRequestStore::available(),
+            // Where the form fetches the options each cascade step offers (UAMS-Web/aether-redirects#120)
+            'cascadeUrl' => cp_route('marketing-redirects.tagged-url.cascade'),
             'jobNumberDescription' => CreativeServices::description(),
             'responseOptions' => [
                 ['value' => '301', 'label' => __('301 Moved Permanently')],
@@ -963,7 +965,7 @@ class MarketingRedirectController extends CpController
             ];
         }, [...$globalStore->pending(), ...$domainStore->pending()]);
 
-        return [...$redirects, ...array_map(fn (array $row): array => $this->taggedPayload($row, $currentUserId), $taggedStore->pending())];
+        return [...$redirects, ...array_map(fn (array $row): array => $this->taggedPayload($row, $currentUserId, $taggedStore), $taggedStore->pending())];
     }
 
     /**
@@ -971,9 +973,10 @@ class MarketingRedirectController extends CpController
      *
      * @param  array<string, mixed>  $row  The stored request
      * @param  string|null  $currentUserId  The current approver's id
+     * @param  TaggedUrlRequestStore  $taggedStore  The store that reads the choices' labels
      * @return array<string, mixed> The request ready for the screen
      */
-    private function taggedPayload(array $row, ?string $currentUserId): array
+    private function taggedPayload(array $row, ?string $currentUserId, TaggedUrlRequestStore $taggedStore): array
     {
         // Every row the store writes carries an id, as above
         // @pest-mutate-ignore:EmptyStringToNotEmpty
@@ -986,6 +989,7 @@ class MarketingRedirectController extends CpController
             'kind' => self::KIND_TAGGED,
             'destination' => $choices->destination,
             'fields' => $choices->fields,
+            'choices' => $taggedStore->choiceSummary($row),
             'suppress_utm' => $choices->suppressUtm,
             'creative_services' => ($row['creative_services'] ?? false) === true,
             'job_number' => \is_string($row['job_number'] ?? null) ? $row['job_number'] : null,

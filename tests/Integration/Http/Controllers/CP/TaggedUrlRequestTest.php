@@ -312,6 +312,7 @@ it('lists a pending tagged-only request in the same review queue as a vanity req
                 'id' => $id,
                 'kind' => MarketingRedirectController::KIND_TAGGED,
                 'destination' => 'https://www.uams.edu/flu',
+                'choices' => [],
                 'fields' => ['utm_campaign' => 'flu-2026', 'utm_id' => '42'],
                 'suppress_utm' => true,
                 'creative_services' => true,
