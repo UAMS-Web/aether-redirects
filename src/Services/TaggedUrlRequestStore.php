@@ -334,7 +334,7 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
             }
         }
 
-        $label = static fn (string $id): string => $catalog->option($id)?->label ?? $id;
+        $label = static fn (string $id): string => $catalog->option($id)->label ?? $id;
         $summary = [];
 
         if ($request->channel !== null) {

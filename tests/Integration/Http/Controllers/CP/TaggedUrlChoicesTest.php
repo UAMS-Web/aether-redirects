@@ -310,7 +310,9 @@ it('shows the id of a choice whose option has since been removed, and no choices
     $id = tcId(tcSubmit(mrdCreator(), ['channel' => 'ch-social']));
     tcSubmit(mrdCreator())->assertCreated();
 
-    Entry::find('ch-social')?->delete();
+    $channel = Entry::find('ch-social');
+    Assert::assertInstanceOf(StatamicEntry::class, $channel);
+    $channel->delete();
 
     test()->actingAs(mrdApprover());
     test()->get(mrdRoute('marketing-redirects.review'))
