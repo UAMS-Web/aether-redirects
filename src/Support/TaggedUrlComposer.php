@@ -66,6 +66,63 @@ final readonly class TaggedUrlComposer
     }
 
     /**
+     * The cascade steps an enabled parameter reads, in cascade order.
+     *
+     * A step no parameter reads is never asked for, since its choice would not reach the URL.
+     *
+     * @return list<string> The step handles
+     */
+    public function stepsInUse(): array
+    {
+        $read = [];
+        foreach ($this->parameters as $parameter) {
+            if ($parameter->from === TaggedUrlParameter::FROM_STEP) {
+                $read[$parameter->source] = $parameter->source;
+            }
+        }
+
+        return array_values(array_filter(TaggedUrlLookup::steps(), static fn (string $step): bool => isset($read[$step])));
+    }
+
+    /**
+     * The parameters that take their value from a choice in a lookup list outside the cascade.
+     *
+     * @return list<TaggedUrlParameter> The list-sourced parameters, in URL order
+     */
+    public function listParameters(): array
+    {
+        return array_values(array_filter($this->parameters, static fn (TaggedUrlParameter $parameter): bool => $parameter->from === TaggedUrlParameter::FROM_LIST));
+    }
+
+    /**
+     * The request field handles the enabled parameters read.
+     *
+     * @return list<string> The handles, each once, in URL order
+     */
+    public function requestFields(): array
+    {
+        $fields = [];
+        foreach ($this->parameters as $parameter) {
+            if ($parameter->from === TaggedUrlParameter::FROM_REQUEST_FIELD) {
+                $fields[$parameter->source] = $parameter->source;
+            }
+        }
+
+        return array_values($fields);
+    }
+
+    /**
+     * The options a lookup list offers, outside the cascade.
+     *
+     * @param  string  $listId  The list entry's id
+     * @return list<LookupOption> The list's active options, in the order a requester sees them
+     */
+    public function optionsOfList(string $listId): array
+    {
+        return $this->catalog->options($listId);
+    }
+
+    /**
      * The tagged URL for a request.
      *
      * @param  TaggedUrlRequest  $request  The request's choices
