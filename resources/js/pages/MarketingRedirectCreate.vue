@@ -39,8 +39,10 @@ const props = defineProps({
     storeUrl: { type: String, required: true },
     // CP endpoint that draws a short-link code
     shortCodeUrl: { type: String, default: '' },
-    // Whether the current user can request ordinary redirects, not only short links
-    canCreateRedirects: { type: Boolean, default: true },
+    // Whether the current user can request a vanity URL, not only a tagged URL or short links
+    canRequestVanity: { type: Boolean, default: true },
+    // Whether the current user can type a back-half; the generated level leaves the source blank
+    canTypeBackHalf: { type: Boolean, default: true },
     // The short-link domain, when the current user can make short links there, else null
     shortLinkHost: { type: String, default: null },
     // Selectable HTTP redirect types ([{ value, label }])
@@ -61,11 +63,14 @@ const instance = getCurrentInstance().proxy;
 const __ = (key) => instance.__(key);
 
 // Whether the user can make nothing but short links, so every request is one.
-const shortLinksOnly = computed(() => !props.canCreateRedirects && props.shortLinkHost !== null);
+const shortLinksOnly = computed(() => !props.canRequestVanity && props.shortLinkHost !== null);
+
+// Whether the user may request nothing but tagged URLs, so every request is one.
+const taggedUserOnly = computed(() => !props.canRequestVanity && props.shortLinkHost === null);
 
 // A blank submission, reused to reset the form after a successful create.
 const blankForm = () => ({
-    kind: 'redirect',
+    kind: taggedUserOnly.value ? 'tagged' : 'redirect',
     host: shortLinksOnly.value ? props.shortLinkHost : '',
     short_link: shortLinksOnly.value,
     source: '',
@@ -230,7 +235,7 @@ async function submit() {
                     v-text="successMessage"
                 />
 
-                <div v-if="taggedAvailable">
+                <div v-if="taggedAvailable && !taggedUserOnly">
                     <span class="mb-1 block text-sm font-medium">{{ __('Request') }}</span>
                     <div class="flex gap-4 text-sm">
                         <label class="flex items-center gap-2">
@@ -249,7 +254,7 @@ async function submit() {
                 <div v-if="!taggedOnly">
                     <label class="mb-1 block text-sm font-medium" for="mr-host">{{ __('Domain') }}</label>
                     <select id="mr-host" v-model="form.host" :class="inputClass" :disabled="shortLinksOnly" @change="hostTouched = true">
-                        <option v-if="!shortLinksOnly" value="">{{ __('Main site (404 redirect)') }}</option>
+                        <option v-if="!shortLinksOnly && canTypeBackHalf" value="">{{ __('Main site (404 redirect)') }}</option>
                         <option v-for="host in hostOptions" :key="host" :value="host">{{ host }}</option>
                     </select>
                     <p class="mt-1 text-xs text-gray-500">
@@ -259,7 +264,7 @@ async function submit() {
                     <p v-if="errorFor('host')" class="mt-1 text-xs text-red-600" v-text="errorFor('host')" />
                 </div>
 
-                <div v-if="!taggedOnly">
+                <div v-if="!taggedOnly && (canTypeBackHalf || offersShortCode)">
                     <label class="mb-1 block text-sm font-medium" for="mr-source">{{ __('Source path') }}</label>
                     <div class="flex gap-2">
                         <input

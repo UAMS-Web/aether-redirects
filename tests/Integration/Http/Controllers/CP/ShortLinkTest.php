@@ -324,7 +324,7 @@ it('opens the create screen to a short-link-only user, with the short-link domai
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('shortLinkHost', ShortCode::HOST)
-            ->where('canCreateRedirects', false)
+            ->where('canRequestVanity', false)
             ->where('shortCodeUrl', mrdRoute('marketing-redirects.short-code')));
 });
 
@@ -335,7 +335,7 @@ it('offers a redirect creator no short-link domain without the permission', func
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('shortLinkHost', null)
-            ->where('canCreateRedirects', true));
+            ->where('canRequestVanity', true));
 });
 
 it('offers no short-link domain while go.uams.edu is not in the domain list', function (): void {
