@@ -60,6 +60,7 @@ final readonly class MarketingRedirect
      * @param  bool  $approvedOnCreate  Whether the row is saved approved instead of pending: a short link whose destination is trusted (UAMS-Web/aether-redirects#84)
      * @param  bool  $creativeServices  Whether the request involves Creative Services (UAMS-Web/aether-redirects#25)
      * @param  string|null  $jobNumber  The Creative Services job number, set only when the request involves Creative Services
+     * @param  string|null  $qrRole  The role in a vanity URL and QR redirect pair, or null for a redirect with no QR code (UAMS-Web/aether-redirects#14)
      */
     public function __construct(
         public string $source,
@@ -74,6 +75,7 @@ final readonly class MarketingRedirect
         public bool $approvedOnCreate = false,
         public bool $creativeServices = false,
         public ?string $jobNumber = null,
+        public ?string $qrRole = null,
     ) {}
 
     /**
@@ -228,7 +230,9 @@ final readonly class MarketingRedirect
         $row = $this->toRow('');
         unset($row['id'], $row['type']);
 
-        return ['host' => $host, 'whole_domain' => false, ...$row, BackHalf::FIELD => $this->generatedBackHalf];
+        $role = $this->qrRole === null ? [] : [QrRedirect::FIELD => $this->qrRole];
+
+        return ['host' => $host, 'whole_domain' => false, ...$row, BackHalf::FIELD => $this->generatedBackHalf, ...$role];
     }
 
     /**

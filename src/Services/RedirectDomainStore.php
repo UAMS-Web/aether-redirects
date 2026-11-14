@@ -153,6 +153,15 @@ final class RedirectDomainStore implements RedirectRequestStore
         $entry->merge($fields);
         $entry->save();
 
+        // A vanity redirect with a QR code is reviewed together with its -QR redirect (UAMS-Web/aether-redirects#14).
+        $companion = (new QrPairFinder)->companionOf($entry);
+
+        // One already reviewed, by hand, keeps its own verdict.
+        if ($companion instanceof StatamicEntry && RedirectStatus::fromRow(self::rowFor($companion, RedirectDomainList::records())) === RedirectStatus::Pending) {
+            $companion->merge($fields);
+            $companion->save();
+        }
+
         return self::rowFor($entry, RedirectDomainList::records());
     }
 
