@@ -328,3 +328,13 @@ it('gives the form the endpoint that offers the options at each step', function 
     test()->get(mrdRoute('marketing-redirects.create'))
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('cascadeUrl', mrdRoute('marketing-redirects.tagged-url.cascade')));
 });
+
+it('shows the custom value typed beside a step choice, and none beside a step that has none', function (): void {
+    tcSubmit(mrdCreator(), ['channel' => 'ch-social', 'steps' => ['source' => 'src-facebook', 'medium' => 'med-feed'], 'custom_values' => ['source' => 'Group']])->assertCreated();
+
+    test()->actingAs(mrdApprover());
+    test()->get(mrdRoute('marketing-redirects.review'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('redirects.0.choices.1', ['name' => 'source', 'option' => 'Facebook', 'custom' => 'Group'])
+            ->where('redirects.0.choices.2', ['name' => 'medium', 'option' => 'Feed', 'custom' => null]));
+});
