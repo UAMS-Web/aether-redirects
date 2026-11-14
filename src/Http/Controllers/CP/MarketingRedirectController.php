@@ -22,6 +22,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
+use UAMSWeb\Aether\Redirects\Services\TaggedUrlChoiceValidator;
 use UAMSWeb\Aether\Redirects\Services\TaggedUrlRequestStore;
 use UAMSWeb\Aether\Redirects\Services\TrustedDestinationReader;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
@@ -31,7 +32,6 @@ use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 use UAMSWeb\Aether\Redirects\Support\ShortCode;
-use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 use UAMSWeb\Aether\Redirects\Support\TypedBackHalf;
 
 /**
@@ -158,7 +158,8 @@ class MarketingRedirectController extends CpController
         RedirectCollisionDetector $detector,
         TrustedDestinationReader $trusted,
         TaggedUrlRequestStore $taggedStore,
-        QrRequestWriter $qrWriter
+        QrRequestWriter $qrWriter,
+        TaggedUrlChoiceValidator $validator
     ): JsonResponse {
         // A short link has its own permission and rules (UAMS-Web/aether-redirects#84).
         if ($request->boolean('short_link')) {
@@ -170,7 +171,7 @@ class MarketingRedirectController extends CpController
         if ($request->input('kind') === self::KIND_TAGGED) {
             abort_unless($this->canRequestTagged(), 403);
 
-            return $this->storeTagged($request, $taggedStore);
+            return $this->storeTagged($request, $taggedStore, $validator);
         }
 
         // Gate the write behind a vanity request permission (UAMS-Web/aether-redirects#12).
@@ -686,9 +687,10 @@ class MarketingRedirectController extends CpController
      *
      * @param  Request  $request  The incoming create request
      * @param  TaggedUrlRequestStore  $store  The tagged-only request store
+     * @param  TaggedUrlChoiceValidator  $validator  Checks the choices against the site's cascade and parameters
      * @return JsonResponse The stored request, or a 422
      */
-    private function storeTagged(Request $request, TaggedUrlRequestStore $store): JsonResponse
+    private function storeTagged(Request $request, TaggedUrlRequestStore $store, TaggedUrlChoiceValidator $validator): JsonResponse
     {
         // The `kind` itself needs no rule: only a submission whose kind is the tagged one reaches here
         $rules = [
@@ -699,10 +701,6 @@ class MarketingRedirectController extends CpController
             'requester' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2048'],
         ];
-
-        foreach (TaggedUrlRequestStore::requestFields() as $field) {
-            $rules[$field] = ['nullable', 'string', 'max:255'];
-        }
 
         foreach (['host', 'source', 'response', 'valid_from', 'valid_until'] as $vanityField) {
             $rules[$vanityField] = ['prohibited'];
@@ -720,25 +718,18 @@ class MarketingRedirectController extends CpController
             return $this->unprocessable('kind', __('Tagged URL requests are not set up on this site.'));
         }
 
-        $fields = [];
-
-        foreach (TaggedUrlRequestStore::requestFields() as $field) {
-            $value = $validated[$field] ?? null;
-
-            if (\is_string($value) && trim($value) !== '') {
-                $fields[$field] = trim($value);
-            }
-        }
-
         /** @var string $destination */
         $destination = $validated['destination'];
 
+        // The choices and request fields are checked against what the site's cascade and parameters offer (UAMS-Web/aether-redirects#26)
+        $choices = $validator->validate(
+            trim($destination),
+            (bool) ($validated[TaggedUrlRequestStore::SUPPRESS_FIELD] ?? false),
+            $request->all(),
+        );
+
         $row = $store->create(
-            new TaggedUrlRequest(
-                destination: trim($destination),
-                fields: $fields,
-                suppressUtm: (bool) ($validated[TaggedUrlRequestStore::SUPPRESS_FIELD] ?? false),
-            ),
+            $choices,
             self::optionalText($validated['requester'] ?? null),
             self::optionalText($validated['notes'] ?? null),
             $this->currentUserId(),

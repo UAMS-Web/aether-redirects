@@ -50,13 +50,44 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
     public const string SUPPRESS_FIELD = 'suppress_utm';
 
     /**
+     * The field the chosen channel option's id is stored in (UAMS-Web/aether-redirects#26).
+     */
+    public const string CHANNEL_FIELD = 'channel';
+
+    /**
+     * The field the option chosen at each cascade step is stored in, as ids by step.
+     */
+    public const string STEPS_FIELD = 'steps';
+
+    /**
+     * The field the options chosen from other lookup lists are stored in, as ids by list id.
+     */
+    public const string LISTS_FIELD = 'lists';
+
+    /**
+     * The field the free-text custom values are stored in, by step or list id.
+     */
+    public const string CUSTOM_FIELD = 'custom_values';
+
+    /**
+     * The field the request field values are stored in, by handle.
+     *
+     * Kept apart from the entry's own fields, so a handle a site's parameter reads can never
+     * overwrite one of them (`status`, `reviewed_by` and the like).
+     */
+    public const string REQUEST_FIELDS_FIELD = 'request_fields';
+
+    /**
      * @param  TaggedUrlLookupReader  $reader  Reads the host's parameters, to compose the URL at approval
      */
     public function __construct(private TaggedUrlLookupReader $reader) {}
 
     /**
-     * The request fields a tagged-only request carries, which the standard
-     * parameters of the same name take their values from (UAMS-Web/aether-redirects#26).
+     * The request fields a request carried before its fields followed the site's parameters
+     * (UAMS-Web/aether-redirects#26), which were stored as fields of the entry itself.
+     *
+     * A row saved then still reads through {@see choices()}; new requests store their
+     * request fields under {@see REQUEST_FIELDS_FIELD}.
      *
      * A method rather than a constant: PCOV attributes no coverage to a constant's
      * initializer, so a mutation run could not select a test for it.
@@ -121,7 +152,7 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
     /**
      * Create a pending entry for a request.
      *
-     * @param  TaggedUrlRequest  $request  The destination, request fields and suppress flag
+     * @param  TaggedUrlRequest  $request  The destination, choices, request fields and suppress flag
      * @param  string|null  $requester  Free-text requester attribution
      * @param  string|null  $notes  Free-text notes
      * @param  string|null  $submittedBy  The Control Panel user id creating the request
@@ -143,19 +174,17 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
             throw new RuntimeException(sprintf('The "%s" collection does not exist.', self::COLLECTION));
         }
 
-        $fields = [];
-
-        foreach (self::requestFields() as $field) {
-            $fields[$field] = $request->fields[$field] ?? null;
-        }
-
         /** @var StatamicEntry $entry */
         $entry = Entry::make();
         $entry->collection(self::COLLECTION);
         $entry->data([
             'title' => $request->destination,
             'destination' => $request->destination,
-            ...$fields,
+            self::CHANNEL_FIELD => $request->channel,
+            self::STEPS_FIELD => $request->steps,
+            self::LISTS_FIELD => $request->lists,
+            self::CUSTOM_FIELD => $request->custom,
+            self::REQUEST_FIELDS_FIELD => $request->fields,
             self::SUPPRESS_FIELD => $request->suppressUtm,
             'creative_services' => $creativeServices,
             'job_number' => $jobNumber,
@@ -245,10 +274,15 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
     /**
      * The choices a stored row carries, as the composer reads them.
      *
+     * Only text is read back: ids and typed values are kept as the strings they were saved
+     * as, and anything else a hand-edited entry holds is ignored. A row saved before the
+     * choices were stored has its request fields as fields of the entry, and reads the same.
+     *
      * @param  array<string, mixed>  $row  A stored row.
      */
     public static function choices(array $row): TaggedUrlRequest
     {
+        // The fields of an older row sit on the entry; a stored value of the same handle wins
         $fields = [];
 
         foreach (self::requestFields() as $field) {
@@ -259,13 +293,39 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
             }
         }
 
+        $fields = [...$fields, ...self::texts($row[self::REQUEST_FIELDS_FIELD] ?? null)];
+
         $destination = $row['destination'] ?? null;
+        $channel = $row[self::CHANNEL_FIELD] ?? null;
 
         return new TaggedUrlRequest(
             destination: \is_string($destination) ? $destination : '',
+            channel: \is_string($channel) && $channel !== '' ? $channel : null,
+            steps: self::texts($row[self::STEPS_FIELD] ?? null),
+            lists: self::texts($row[self::LISTS_FIELD] ?? null),
+            custom: self::texts($row[self::CUSTOM_FIELD] ?? null),
             fields: $fields,
             suppressUtm: ($row[self::SUPPRESS_FIELD] ?? false) === true,
         );
+    }
+
+    /**
+     * The text entries of a stored map.
+     *
+     * @param  mixed  $value  The stored value
+     * @return array<string, string> The entries whose key and value are text, in stored order
+     */
+    private static function texts(mixed $value): array
+    {
+        $texts = [];
+
+        foreach (\is_array($value) ? $value : [] as $key => $text) {
+            if (\is_string($text)) {
+                $texts[(string) $key] = $text;
+            }
+        }
+
+        return $texts;
     }
 
     /**
