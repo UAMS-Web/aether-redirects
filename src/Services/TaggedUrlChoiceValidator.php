@@ -36,7 +36,7 @@ final readonly class TaggedUrlChoiceValidator
      *
      * @param  string  $destination  The URL the tag is added to
      * @param  bool  $suppressUtm  Whether the submission leaves every `utm_*` parameter out
-     * @param  array<string, mixed>  $input  The submission: `channel`, `steps`, `lists`, `custom_values`, and each request field by handle
+     * @param  array<mixed>  $input  The submission: `channel`, `steps`, `lists`, `custom_values`, and each request field by handle
      * @return TaggedUrlRequest The request, holding only values that passed
      *
      * @throws ValidationException When a choice or a field is not allowed, naming each.
@@ -166,7 +166,7 @@ final readonly class TaggedUrlChoiceValidator
      *
      * @param  mixed  $value  The submitted value
      * @param  string  $name  The name the error is filed under
-     * @param  array<string, list<string>>  $errors  The errors so far
+     * @param  array<string, list<array<mixed>|string>>  $errors  The errors so far
      * @return string|null The trimmed text, or null when the value is not usable
      */
     private function text(mixed $value, string $name, array &$errors): ?string
@@ -193,7 +193,7 @@ final readonly class TaggedUrlChoiceValidator
      *
      * @param  mixed  $value  The submitted value
      * @param  string  $name  The name the error is filed under
-     * @param  array<string, list<string>>  $errors  The errors so far
+     * @param  array<string, list<array<mixed>|string>>  $errors  The errors so far
      * @return array<string, mixed> The map
      */
     private function map(mixed $value, string $name, array &$errors): array
@@ -224,7 +224,7 @@ final readonly class TaggedUrlChoiceValidator
      */
     private function isFilled(mixed $value): bool
     {
-        return $value !== null && $value !== '' && $value !== [] && (! \is_string($value) || trim($value) !== '');
+        return ! in_array($value, [null, '', []], true) && (! \is_string($value) || trim($value) !== '');
     }
 
     /**

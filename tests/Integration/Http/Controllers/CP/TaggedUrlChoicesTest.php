@@ -6,6 +6,7 @@ require_once __DIR__.'/../../../../Support/MarketingRedirectDomainHelpers.php';
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Assert;
 use Statamic\Auth\File\User as FileStatamicUser;
 use Statamic\Entries\Collection as StatamicCollection;
@@ -207,6 +208,7 @@ it('saves a request pending with its channel, step choices, list choices, custom
     $response = tcSubmit(mrdCreator(), tcChoices());
 
     $response->assertCreated();
+
     $id = tcId($response);
 
     expect(tcField($id, 'status'))->toBe('pending')
@@ -235,6 +237,7 @@ it('keeps blank choices out of the saved request', function (): void {
 });
 
 it('refuses a choice the cascade does not offer, naming the field, and saves nothing', function (array $overrides, string $field): void {
+    /** @var array<string, mixed> $overrides */
     tcSubmit(mrdCreator(), $overrides)
         ->assertStatus(422)
         ->assertJsonValidationErrors($field);
@@ -257,6 +260,7 @@ it('offers a step its generic list when no choice names one', function (): void 
 });
 
 it('refuses a list choice from a list no parameter reads, an option not in the list, and a custom value no parameter reads', function (array $overrides, string $field): void {
+    /** @var array<string, mixed> $overrides */
     tcSubmit(mrdCreator(), $overrides)
         ->assertStatus(422)
         ->assertJsonValidationErrors($field);
@@ -287,6 +291,7 @@ it('refuses a request field no parameter reads rather than dropping it', functio
 });
 
 it('refuses a request field that is too long or not text', function (array $overrides, string $field): void {
+    /** @var array<string, mixed> $overrides */
     tcSubmit(mrdCreator(), $overrides)->assertStatus(422)->assertJsonValidationErrors($field);
 })->with([
     'a long request field' => [['vanity_path' => str_repeat('a', 256)], 'vanity_path'],
@@ -392,5 +397,5 @@ it('shows a pending request with the fields it was saved with', function (): voi
 
     test()->actingAs(mrdApprover());
     test()->get(mrdRoute('marketing-redirects.review'))
-        ->assertInertia(fn ($page) => $page->where('redirects.0.fields', ['utm_campaign' => 'flu-2026', 'vanity_path' => '/flu']));
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('redirects.0.fields', ['utm_campaign' => 'flu-2026', 'vanity_path' => '/flu']));
 });
