@@ -81,11 +81,18 @@ it('finds nothing for an unknown id or an entry of another collection', function
     expect($after->get('status'))->toBe('pending');
 });
 
-it('stores only the request fields it knows, and lists pending requests only', function (): void {
+it('stores the choices it is given apart from its own fields, and lists pending requests only', function (): void {
     turStoreCollection();
 
     $row = turStore()->create(
-        new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'flu', 'utm_source' => 'not-a-request-field']),
+        new TaggedUrlRequest(
+            'https://www.uams.edu/',
+            channel: 'ch1',
+            steps: ['source' => 's1', 'medium' => 'm1'],
+            lists: ['l1' => 'o1'],
+            custom: ['medium' => 'Extra'],
+            fields: ['utm_campaign' => 'flu', 'status' => 'approved'],
+        ),
         'Comms',
         'Notes',
         'creator',
@@ -94,9 +101,12 @@ it('stores only the request fields it knows, and lists pending requests only', f
     );
 
     expect($row)->toHaveKey('id')
-        ->and($row['utm_campaign'])->toBe('flu')
-        ->and($row['utm_id'])->toBeNull()
-        ->and($row)->not->toHaveKey('utm_source')
+        ->and($row['channel'])->toBe('ch1')
+        ->and($row['steps'])->toBe(['source' => 's1', 'medium' => 'm1'])
+        ->and($row['lists'])->toBe(['l1' => 'o1'])
+        ->and($row['custom_values'])->toBe(['medium' => 'Extra'])
+        ->and($row['request_fields'])->toBe(['utm_campaign' => 'flu', 'status' => 'approved'])
+        ->and($row['status'])->toBe('pending')
         ->and($row['requester'])->toBe('Comms')
         ->and($row['notes'])->toBe('Notes');
 
@@ -125,6 +135,26 @@ it('reads the choices of a stored row, ignoring values that are not text and a s
         new TaggedUrlRequest(''),
     ],
     'nothing stored' => [[], new TaggedUrlRequest('')],
+    'a row saved before the choices were stored' => [
+        ['destination' => 'https://www.uams.edu/', 'utm_campaign' => 'flu'],
+        new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'flu']),
+    ],
+    'the stored request fields win over an older field of the same handle' => [
+        ['destination' => 'https://www.uams.edu/', 'utm_campaign' => 'old', 'request_fields' => ['utm_campaign' => 'new', 'vanity_path' => '/flu']],
+        new TaggedUrlRequest('https://www.uams.edu/', fields: ['utm_campaign' => 'new', 'vanity_path' => '/flu']),
+    ],
+    'every choice' => [
+        ['destination' => 'https://www.uams.edu/', 'channel' => 'ch1', 'steps' => ['source' => 's1'], 'lists' => ['l1' => 'o1'], 'custom_values' => ['source' => 'x']],
+        new TaggedUrlRequest('https://www.uams.edu/', 'ch1', ['source' => 's1'], ['l1' => 'o1'], ['source' => 'x']),
+    ],
+    'choices that are not text, and a blank channel' => [
+        ['destination' => 'https://www.uams.edu/', 'channel' => '', 'steps' => ['source' => 5, 'medium' => 'm1'], 'lists' => 'l1', 'custom_values' => ['source' => ['x']], 'request_fields' => 'x'],
+        new TaggedUrlRequest('https://www.uams.edu/', steps: ['medium' => 'm1']),
+    ],
+    'a channel that is not text' => [
+        ['destination' => 'https://www.uams.edu/', 'channel' => 7],
+        new TaggedUrlRequest('https://www.uams.edu/'),
+    ],
 ]);
 
 it('names every field the store writes in the reference blueprint the host copies', function (): void {
@@ -146,10 +176,15 @@ it('names every field the store writes in the reference blueprint the host copie
     }
 
     $written = array_values(array_diff(array_keys($row), ['id', 'title']));
-    sort($written);
-    sort($handles);
 
-    expect($handles)->toBe($written);
+    // The three fixed fields stay in the blueprint for the requests saved before the request fields moved into their own map
+    $legacy = TaggedUrlRequestStore::requestFields();
+    $current = array_values(array_diff($handles, $legacy));
+    sort($written);
+    sort($current);
+
+    expect($current)->toBe($written)
+        ->and(array_values(array_intersect($handles, $legacy)))->toEqualCanonicalizing($legacy);
 });
 
 it('lists the pending requests as a list, ordered by destination', function (): void {
@@ -188,4 +223,10 @@ it('writes a review to the entry file, and clears an earlier rejection reason on
     expect($file)->toContain('status: approved')
         ->and($file)->toContain('tagged_url:')
         ->and($file)->not->toContain('Not yet');
+});
+
+it('reads a blank stored channel as no channel, and a number as the id it is', function (): void {
+    expect(TaggedUrlRequestStore::choices(['channel' => ''])->channel)->toBeNull()
+        ->and(TaggedUrlRequestStore::choices(['channel' => 'ch1'])->channel)->toBe('ch1')
+        ->and(TaggedUrlRequestStore::choices(['steps' => ['source' => 's1', 'medium' => 3]])->steps)->toBe(['source' => 's1']);
 });

@@ -141,3 +141,13 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Rejected.** Counting an expired approved redirect as holding the back-half forever: the existing 12-week reuse buffer for vanity paths already says when a path may be reused, and the rule follows it. Counting pending requests at approval: each of two pending requests would block the other.
 
 **Companion.** `UAMS-Web/aether-redirects#16`; who may type a back-half is `UAMS-Web/aether-redirects#13`.
+
+## 2026-11-14: A tagged-only request stores its choices as ids and typed text, and its request fields apart from the entry's own (#119)
+
+**Decision.** A tagged-only request stores the channel, the option chosen at each step, the options chosen from other lists, the typed custom values and the request field values, as ids and text only. The request fields are the handles the site's enabled parameters read, kept under one `request_fields` map. Each submission is checked server-side: a chosen option must be one the cascade offers at that step given the earlier choices, a list choice must belong to a list a parameter reads, a custom value is bounded text, and a field no parameter reads is refused with a `422` naming it. A row saved before this, with its three fixed fields on the entry, reads the same.
+
+**Why.** The issued URL is the record of what was issued, so a later change to a list or a parameter cannot change it, and the choices need no copy of the lookup entries. A handle a site's parameter reads is the site's to choose; stored beside the entry's own fields, a handle named `status` would let a requester set a workflow field, so the values sit in their own map.
+
+**Rejected.** Storing each request field as a field of the entry, as the three fixed ones were: a site-defined handle could collide with a workflow field. Dropping a field no parameter reads: a submission that meant to set it would be saved without it and nobody told. Copying the option entries into the request: it would let a retired option's text outlive the list that retired it, for a record the issued URL already is.
+
+**Companion.** `UAMS-Web/aether-redirects#119`, part of `UAMS-Web/aether-redirects#26`.

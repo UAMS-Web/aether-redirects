@@ -132,6 +132,17 @@ function turField(string $id, string $field): mixed
     return $entry->get($field);
 }
 
+/**
+ * A request field value stored on the request with the given id.
+ */
+function turRequestField(string $id, string $handle): mixed
+{
+    $fields = turField($id, TaggedUrlRequestStore::REQUEST_FIELDS_FIELD);
+    Assert::assertIsArray($fields);
+
+    return $fields[$handle] ?? null;
+}
+
 it('saves a request with the tagged URL part only, pending and with no tagged URL yet', function (): void {
     $creator = mrdCreator();
 
@@ -151,9 +162,9 @@ it('saves a request with the tagged URL part only, pending and with no tagged UR
     expect(turField($id, 'status'))->toBe('pending')
         ->and(turField($id, 'title'))->toBe('https://www.uams.edu/flu')
         ->and(turField($id, 'destination'))->toBe('https://www.uams.edu/flu')
-        ->and(turField($id, 'utm_campaign'))->toBe('flu-2026')
-        ->and(turField($id, 'utm_id'))->toBe('42')
-        ->and(turField($id, 'utm_marketing_tactic'))->toBeNull()
+        ->and(turRequestField($id, 'utm_campaign'))->toBe('flu-2026')
+        ->and(turRequestField($id, 'utm_id'))->toBe('42')
+        ->and(turRequestField($id, 'utm_marketing_tactic'))->toBeNull()
         ->and(turField($id, TaggedUrlRequestStore::SUPPRESS_FIELD))->toBeFalse()
         ->and(turField($id, 'requester'))->toBe('Comms')
         ->and(turField($id, 'notes'))->toBeNull()
@@ -215,7 +226,7 @@ it('accepts an empty value for each optional field', function (): void {
         'notes' => null,
     ])->assertCreated());
 
-    expect(turField($id, 'utm_campaign'))->toBeNull()
+    expect(turRequestField($id, 'utm_campaign'))->toBeNull()
         ->and(turField($id, TaggedUrlRequestStore::SUPPRESS_FIELD))->toBeFalse()
         ->and(turField($id, 'requester'))->toBeNull()
         ->and(turField($id, 'notes'))->toBeNull();
@@ -239,8 +250,8 @@ it('trims every value itself, without the middleware that trims them', function 
     ])->assertCreated());
 
     expect(turField($id, 'destination'))->toBe('https://www.uams.edu/flu')
-        ->and(turField($id, 'utm_campaign'))->toBe('flu-2026')
-        ->and(turField($id, 'utm_id'))->toBeNull()
+        ->and(turRequestField($id, 'utm_campaign'))->toBe('flu-2026')
+        ->and(turRequestField($id, 'utm_id'))->toBeNull()
         ->and(turField($id, 'requester'))->toBe('Comms')
         ->and(turField($id, 'notes'))->toBeNull();
 });

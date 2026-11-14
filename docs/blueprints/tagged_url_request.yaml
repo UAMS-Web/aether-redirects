@@ -62,6 +62,45 @@ tabs:
               type: textarea
               display: Notes
       -
+        display: Choices
+        instructions: 'The choices the request was made with, saved by the utility and read back when the request is approved: the ids of the options chosen, the text typed beside them, and the values of the request fields the site''s parameters read. `utm_campaign`, `utm_id` and `utm_marketing_tactic` above hold the values of a request saved before the request fields followed the parameters, and are still read for it. The issued URL, not these entries, is the record of what was issued.'
+        fields:
+          -
+            handle: channel
+            field:
+              type: text
+              display: Channel
+              instructions: 'The id of the chosen channel option.'
+              visibility: read_only
+          -
+            handle: steps
+            field:
+              type: array
+              display: 'Step choices'
+              instructions: 'The id of the option chosen at each cascade step, by step.'
+              visibility: read_only
+          -
+            handle: lists
+            field:
+              type: array
+              display: 'List choices'
+              instructions: 'The id of the option chosen from each other lookup list, by list id.'
+              visibility: read_only
+          -
+            handle: custom_values
+            field:
+              type: array
+              display: 'Custom values'
+              instructions: 'The text typed beside a step or list choice, by step or list id.'
+              visibility: read_only
+          -
+            handle: request_fields
+            field:
+              type: array
+              display: 'Request fields'
+              instructions: 'The value of each request field a parameter reads, by handle.'
+              visibility: read_only
+      -
         display: Approval
         instructions: 'Fields the utility writes. The tagged URL is composed and stored when an approver approves the request, so a later change to a parameter or a lookup list does not change it.'
         fields:

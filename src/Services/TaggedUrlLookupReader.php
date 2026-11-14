@@ -56,10 +56,22 @@ class TaggedUrlLookupReader
             $this->catalog(),
             TaggedUrlParameter::firstId($variables?->get(TaggedUrlLookup::CHANNEL_LIST_FIELD)),
             $generic,
-            TaggedUrlParameter::fromGlobal(
-                $variables?->get('standard_parameters'),
-                $variables?->get('custom_parameters'),
-            ),
+            $this->parameterList(),
+        );
+    }
+
+    /**
+     * The parameters a tagged URL carries, from the host's parameters global.
+     *
+     * @return list<TaggedUrlParameter> The parameters in URL order, or none when the host defines none
+     */
+    public function parameterList(): array
+    {
+        $variables = $this->parameters();
+
+        return TaggedUrlParameter::fromGlobal(
+            $variables?->get('standard_parameters'),
+            $variables?->get('custom_parameters'),
         );
     }
 

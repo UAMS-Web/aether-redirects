@@ -68,7 +68,6 @@ function ttpSubmit(FileStatamicUser $user, array $overrides = []): TestResponse
     return $test->postJson(mrdRoute('marketing-redirects.store'), [
         'kind' => MarketingRedirectController::KIND_TAGGED,
         'destination' => 'https://www.uams.edu/flu',
-        'utm_campaign' => 'flu-2026',
         'creative_services' => 'no',
         ...$overrides,
     ]);

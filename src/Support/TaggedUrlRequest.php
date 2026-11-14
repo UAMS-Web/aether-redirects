@@ -14,10 +14,10 @@ final readonly class TaggedUrlRequest
     /**
      * @param  string  $destination  The URL the tag is added to
      * @param  string|null  $channel  The chosen channel option's id
-     * @param  array<string, string>  $steps  The chosen option id at each cascade step, by step
-     * @param  array<string, string>  $lists  The chosen option id from other lookup lists, by list id
-     * @param  array<string, string>  $custom  Free-text custom values, by step or list id
-     * @param  array<string, string>  $fields  Request field values, by handle
+     * @param  array<array-key, string>  $steps  The chosen option id at each cascade step, by step
+     * @param  array<array-key, string>  $lists  The chosen option id from other lookup lists, by list id
+     * @param  array<array-key, string>  $custom  Free-text custom values, by step or list id
+     * @param  array<array-key, string>  $fields  Request field values, by handle
      * @param  bool  $suppressUtm  Whether to leave every `utm_*` parameter out
      */
     public function __construct(

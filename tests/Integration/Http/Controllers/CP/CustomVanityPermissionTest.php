@@ -132,7 +132,6 @@ it('includes the tagged URL level, and nothing wider, in the custom level', func
     test()->postJson(mrdRoute('marketing-redirects.store'), [
         'kind' => MarketingRedirectController::KIND_TAGGED,
         'destination' => 'https://www.uams.edu/flu',
-        'utm_campaign' => 'flu-2026',
         'creative_services' => 'no',
     ])->assertCreated();
 
