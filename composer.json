@@ -46,11 +46,14 @@
     },
     "require": {
         "php": "^8.4",
+        "bacon/bacon-qr-code": "^3.1",
+        "setasign/fpdf": "^1.9",
         "statamic/cms": "^6.40"
     },
     "require-dev": {
         "cweagans/composer-patches": "^2.0",
         "driftingly/rector-laravel": "^2.6",
+        "khanamiryan/qrcode-detector-decoder": "^2.0.3",
         "larastan/larastan": "^3.13",
         "laravel/pint": "^1.32",
         "orchestra/testbench": "^11.3",
