@@ -95,7 +95,9 @@ final readonly class TaggedUrlComposer
     }
 
     /**
-     * The request field handles the enabled parameters read.
+     * The request field handles the enabled parameters read that a requester types.
+     *
+     * The handles the system fills are left out ({@see TaggedUrlParameter::reservedFields()}).
      *
      * @return list<string> The handles, each once, in URL order
      */
@@ -103,7 +105,7 @@ final readonly class TaggedUrlComposer
     {
         $fields = [];
         foreach ($this->parameters as $parameter) {
-            if ($parameter->from === TaggedUrlParameter::FROM_REQUEST_FIELD) {
+            if ($parameter->from === TaggedUrlParameter::FROM_REQUEST_FIELD && ! TaggedUrlParameter::isReserved($parameter->source)) {
                 $fields[$parameter->source] = $parameter->source;
             }
         }
@@ -153,9 +155,31 @@ final readonly class TaggedUrlComposer
         return match ($parameter->from) {
             TaggedUrlParameter::FROM_STEP => $this->optionValue($request->steps[$source] ?? null, $request->custom[$source] ?? null),
             TaggedUrlParameter::FROM_LIST => $this->optionValue($request->lists[$source] ?? null, $request->custom[$source] ?? null),
-            TaggedUrlParameter::FROM_REQUEST_FIELD => trim($request->fields[$source] ?? ''),
+            TaggedUrlParameter::FROM_REQUEST_FIELD => $this->fieldValue($source, $request),
             default => $source,
         };
+    }
+
+    /**
+     * A request field's value: what the requester typed, or what the system fills.
+     *
+     * @param  string  $handle  The request field handle
+     * @param  TaggedUrlRequest  $request  The request's choices
+     * @return string The value, or an empty string when the request gives none
+     */
+    private function fieldValue(string $handle, TaggedUrlRequest $request): string
+    {
+        $reserved = TaggedUrlParameter::reservedFields();
+
+        if ($handle === $reserved['vanity']) {
+            return mb_strtolower(trim($request->vanity ?? ''));
+        }
+
+        if ($handle === $reserved['qr']) {
+            return $request->qr === null ? '' : ($request->qr ? 'true' : 'false');
+        }
+
+        return trim($request->fields[$handle] ?? '');
     }
 
     /**

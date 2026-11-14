@@ -180,6 +180,14 @@ async function confirmReject(row) {
                                         · {{ __('Window') }}: {{ row.valid_from || '…' }} – {{ row.valid_until || '…' }}
                                     </span>
                                 </p>
+                                <p v-if="row.tagged" class="mt-1 text-xs text-gray-500" data-tagged>
+                                    {{ __('Tagged URL') }}:
+                                    <span v-for="choice in row.tagged.choices" :key="choice.name" data-choice>
+                                        <code>{{ choice.name }}</code>: {{ choice.option }}<template v-if="choice.custom"> ({{ choice.custom }})</template> ·
+                                    </span>
+                                    <span v-for="(value, name) in row.tagged.fields" :key="name"><code>{{ name }}</code>={{ value }} · </span>
+                                    <span v-if="row.tagged.suppress_utm">{{ __('utm_ parameters left off') }}</span>
+                                </p>
                                 <p v-if="row.notes" class="mt-1 text-xs text-gray-500" v-text="row.notes" />
                             </div>
 

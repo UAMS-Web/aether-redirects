@@ -28,6 +28,11 @@ final readonly class MarketingRedirect
     public const string SET_HANDLE = 'redirect';
 
     /**
+     * The row field holding the tagged URL choices a request was made with (UAMS-Web/aether-redirects#125).
+     */
+    public const string TAGGED_CHOICES_FIELD = 'tagged_choices';
+
+    /**
      * The default `order` value for a utility-created redirect, matching the
      * blueprint default so page-specific redirects sort predictably.
      */
@@ -61,6 +66,7 @@ final readonly class MarketingRedirect
      * @param  bool  $creativeServices  Whether the request involves Creative Services (UAMS-Web/aether-redirects#25)
      * @param  string|null  $jobNumber  The Creative Services job number, set only when the request involves Creative Services
      * @param  string|null  $qrRole  The role in a vanity URL and QR redirect pair, or null for a redirect with no QR code (UAMS-Web/aether-redirects#14)
+     * @param  array<string, mixed>|null  $taggedChoices  The tagged URL choices kept until approval composes the destination, or null for a redirect with none (UAMS-Web/aether-redirects#125)
      */
     public function __construct(
         public string $source,
@@ -76,6 +82,7 @@ final readonly class MarketingRedirect
         public bool $creativeServices = false,
         public ?string $jobNumber = null,
         public ?string $qrRole = null,
+        public ?array $taggedChoices = null,
     ) {}
 
     /**
@@ -114,6 +121,19 @@ final readonly class MarketingRedirect
     }
 
     /**
+     * Return this redirect carrying tagged URL choices (UAMS-Web/aether-redirects#125).
+     *
+     * Approval composes the destination from them, so the destination kept until then is the one typed.
+     *
+     * @param  TaggedUrlRequest  $choices  The validated choices
+     * @return self The same redirect, with the choices kept
+     */
+    public function withTaggedChoices(TaggedUrlRequest $choices): self
+    {
+        return $this->copyWith(taggedChoices: $choices->toStored());
+    }
+
+    /**
      * Return this redirect with a generated back-half as its source
      * (UAMS-Web/aether-redirects#15).
      *
@@ -137,6 +157,7 @@ final readonly class MarketingRedirect
             generatedBackHalf: true,
             creativeServices: $this->creativeServices,
             jobNumber: $this->jobNumber,
+            taggedChoices: $this->taggedChoices,
         );
     }
 
@@ -166,6 +187,32 @@ final readonly class MarketingRedirect
             approvedOnCreate: $approved,
             creativeServices: $this->creativeServices,
             jobNumber: $this->jobNumber,
+            taggedChoices: $this->taggedChoices,
+        );
+    }
+
+    /**
+     * This redirect with the given tagged URL choices.
+     *
+     * @param  array<string, mixed>|null  $taggedChoices  The choices as {@see TaggedUrlRequest::toStored()} wrote them
+     */
+    private function copyWith(?array $taggedChoices): self
+    {
+        return new self(
+            source: $this->source,
+            destination: $this->destination,
+            response: $this->response,
+            window: $this->window,
+            requester: $this->requester,
+            notes: $this->notes,
+            submittedBy: $this->submittedBy,
+            host: $this->host,
+            generatedBackHalf: $this->generatedBackHalf,
+            approvedOnCreate: $this->approvedOnCreate,
+            creativeServices: $this->creativeServices,
+            jobNumber: $this->jobNumber,
+            qrRole: $this->qrRole,
+            taggedChoices: $taggedChoices,
         );
     }
 
@@ -188,6 +235,8 @@ final readonly class MarketingRedirect
      */
     public function toRow(string $id): array
     {
+        $choices = $this->taggedChoices === null ? [] : [self::TAGGED_CHOICES_FIELD => $this->taggedChoices];
+
         return [
             'id' => $id,
             'type' => self::SET_HANDLE,
@@ -208,6 +257,7 @@ final readonly class MarketingRedirect
             'submitted_by' => $this->submittedBy,
             'reviewed_by' => null,
             'rejection_reason' => null,
+            ...$choices,
         ];
     }
 

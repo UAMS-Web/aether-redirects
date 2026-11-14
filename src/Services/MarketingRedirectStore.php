@@ -190,15 +190,21 @@ class MarketingRedirectStore implements RedirectRequestStore
      *
      * @throws RuntimeException When the `redirects` global set does not exist
      */
-    public function approve(string $id, string $reviewerId): ?array
+    public function approve(string $id, string $reviewerId, ?Closure $destinationFor = null): ?array
     {
-        // Flip the status to approved and clear any stale rejection reason.
-        return $this->mutateRow($id, static fn (array $row): array => [
-            ...$row,
-            'status' => RedirectStatus::Approved->value,
-            'reviewed_by' => $reviewerId,
-            'rejection_reason' => null,
-        ]);
+        // Flip the status to approved and clear any stale rejection reason, issuing the destination
+        // a request with tagged URL choices was made for (UAMS-Web/aether-redirects#125).
+        return $this->mutateRow($id, static function (array $row) use ($reviewerId, $destinationFor): array {
+            $destination = $destinationFor instanceof Closure ? $destinationFor($row) : null;
+
+            return [
+                ...$row,
+                'status' => RedirectStatus::Approved->value,
+                'reviewed_by' => $reviewerId,
+                'rejection_reason' => null,
+                ...(\is_string($destination) ? ['target_url' => $destination] : []),
+            ];
+        });
     }
 
     /**

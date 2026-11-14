@@ -37,6 +37,31 @@ final readonly class TaggedUrlParameter
     public const string FROM_FIXED_VALUE = 'fixed_value';
 
     /**
+     * The request field handles the system fills on a vanity request, which a requester never types
+     * (UAMS-Web/aether-redirects#125).
+     *
+     * A parameter that reads `vanity_url` gets the redirect's own vanity domain and back-half, and one
+     * that reads `qr_code` gets `true` on the `-QR` redirect and `false` on any other. A method rather
+     * than constants, since PCOV attributes no coverage to a constant's initializer.
+     *
+     * @return array{vanity: string, qr: string} The handle of each
+     */
+    public static function reservedFields(): array
+    {
+        return ['vanity' => 'vanity_url', 'qr' => 'qr_code'];
+    }
+
+    /**
+     * Whether a request field handle is one the system fills.
+     *
+     * @param  string  $handle  The handle
+     */
+    public static function isReserved(string $handle): bool
+    {
+        return \in_array($handle, self::reservedFields(), true);
+    }
+
+    /**
      * The standard parameters, in the order a URL carries them, each with its source.
      *
      * A method rather than a constant, so a mutation run sees each entry covered by
