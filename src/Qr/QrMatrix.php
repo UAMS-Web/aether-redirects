@@ -19,6 +19,9 @@ final readonly class QrMatrix
     /**
      * The quiet zone around the modules, in modules.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the size assertions in `QrFilesTest` pin it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     public const int QUIET_ZONE = 4;
 
     /**

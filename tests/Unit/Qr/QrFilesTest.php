@@ -27,7 +27,9 @@ const QR_URL = 'https://uams.health/v6qzl2N-QR';
 function qrImage(string $png): GdImage
 {
     $image = imagecreatefromstring($png);
-    assert($image instanceof GdImage);
+    if (! $image instanceof GdImage) {
+        throw new RuntimeException('The PNG could not be read.');
+    }
 
     return $image;
 }
@@ -45,7 +47,9 @@ function qrSide(string $png): int
 function qrPixel(GdImage $image, int $x, int $y): array
 {
     $index = imagecolorat($image, $x, $y);
-    assert(is_int($index));
+    if (! is_int($index)) {
+        throw new RuntimeException('The pixel is outside the image.');
+    }
 
     return imagecolorsforindex($image, $index);
 }
@@ -114,6 +118,34 @@ it('writes the PNG at least 1,000 pixels square, with whole pixels per module, b
         ->and($finder)->toMatchArray(['red' => 0, 'green' => 0, 'blue' => 0]);
 });
 
+it('paints in the PNG exactly the modules of the matrix, every pixel', function (): void {
+    $matrix = QrMatrix::encode(QR_URL);
+    $png = (new PngWriter)->write($matrix);
+    $image = qrImage($png);
+    $side = qrSide($png);
+    $unit = intdiv($side, 37);
+
+    $dark = [];
+    foreach ($matrix->darkModules() as [$x, $y]) {
+        $dark[$x.','.$y] = true;
+    }
+
+    $wrong = 0;
+    for ($row = 0; $row < $side; $row++) {
+        for ($column = 0; $column < $side; $column++) {
+            $isDark = isset($dark[intdiv($column, $unit).','.intdiv($row, $unit)]);
+            $isBlack = (qrPixel($image, $column, $row)['red'] === 0);
+
+            if ($isDark !== $isBlack) {
+                $wrong++;
+            }
+        }
+    }
+
+    expect($side)->toBe(1036)
+        ->and($wrong)->toBe(0);
+});
+
 it('does not decode a blank image, or a code with a finder pattern painted over', function (): void {
     $png = (new PngWriter)->write(QrMatrix::encode(QR_URL));
     $image = qrImage($png);
@@ -122,7 +154,9 @@ it('does not decode a blank image, or a code with a finder pattern painted over'
 
     // Blank
     $blank = imagecreatetruecolor(1036, 1036);
-    assert($blank instanceof GdImage);
+    if (! $blank instanceof GdImage) {
+        throw new RuntimeException('GD could not make the blank image.');
+    }
     imagefill($blank, 0, 0, (int) imagecolorallocate($blank, 255, 255, 255));
     ob_start();
     imagepng($blank);
@@ -144,9 +178,8 @@ it('draws in the SVG exactly the modules of the matrix', function (): void {
     $svg = (new SvgWriter)->write($matrix);
 
     expect(qrSvgModules($svg))->toBe(qrModulesOf($matrix))
-        ->and($svg)->toContain('viewBox="0 0 37 37"')
-        ->and($svg)->toContain('fill="#fff"')
-        ->and($svg)->toContain('fill="#000"');
+        ->and($svg)->toStartWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 37 37\" shape-rendering=\"crispEdges\"><rect width=\"37\" height=\"37\" fill=\"#fff\"/><path fill=\"#000\" d=\"M4 4h1v1h-1zM5 4h1v1h-1z")
+        ->and($svg)->toEndWith("\"/></svg>\n");
 });
 
 it('draws in the EPS exactly the modules of the matrix', function (): void {
@@ -155,8 +188,8 @@ it('draws in the EPS exactly the modules of the matrix', function (): void {
 
     expect(qrEpsModules($eps, 37))->toBe(qrModulesOf($matrix))
         ->and($eps)->toStartWith('%!PS-Adobe-3.0 EPSF-3.0')
-        ->and($eps)->toContain('%%BoundingBox: 0 0 370 370')
-        ->and($eps)->toContain('1 setgray 0 0 370 370 rectfill');
+        ->and($eps)->toStartWith("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 370 370\n%%EndComments\n1 setgray 0 0 370 370 rectfill\n0 setgray\n")
+        ->and($eps)->toEndWith("showpage\n%%EOF\n");
 });
 
 it('draws in the PDF exactly the modules of the matrix, on one page of the code size', function (): void {
@@ -167,7 +200,8 @@ it('draws in the PDF exactly the modules of the matrix, on one page of the code 
         ->and($pdf)->toStartWith('%PDF-')
         ->and(preg_match_all('/\/Type \/Page\b(?!s)/', $pdf))->toBe(1)
         ->and($pdf)->toContain('/MediaBox [0 0 370.00 370.00]')
-        ->and($pdf)->not->toContain('/Subtype /Image');
+        ->and($pdf)->not->toContain('/Subtype /Image')
+        ->and($pdf)->toContain("\n0.000 g\n");
 });
 
 it('fails the comparison when one module is wrong in the SVG, the EPS or the PDF', function (): void {

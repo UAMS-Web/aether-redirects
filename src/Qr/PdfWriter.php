@@ -18,6 +18,9 @@ final class PdfWriter implements QrWriter
     /**
      * The side of a module in points.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the media box assertion in `QrFilesTest` pins it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     public const int UNIT = 10;
 
     public function extension(): string
@@ -31,8 +34,6 @@ final class PdfWriter implements QrWriter
 
         $pdf = new FPDF('P', 'pt', [$side, $side]);
         $pdf->SetCompression(false);
-        $pdf->SetAutoPageBreak(false);
-        $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();
         $pdf->SetFillColor(0, 0, 0);
 

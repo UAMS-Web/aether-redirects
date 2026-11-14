@@ -21,6 +21,7 @@ use Statamic\Providers\AddonServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException as SymfonyNotFoundHttpException;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
+use UAMSWeb\Aether\Redirects\Http\Controllers\CP\QrCodeController;
 use UAMSWeb\Aether\Redirects\Http\Middleware\ServeRedirectDomainRequests;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\NotFoundRedirectResolver;
@@ -146,6 +147,9 @@ class ServiceProvider extends AddonServiceProvider
                 Route::get('review', [MarketingRedirectController::class, 'index'])->name('review');
                 Route::post('{redirect}/approve', [MarketingRedirectController::class, 'approve'])->name('approve');
                 Route::post('{redirect}/reject', [MarketingRedirectController::class, 'reject'])->name('reject');
+                Route::get('{redirect}/qr', [QrCodeController::class, 'show'])->name('qr');
+                Route::post('{redirect}/qr', [QrCodeController::class, 'generate'])->name('qr.generate');
+                Route::get('{redirect}/qr/{format}', [QrCodeController::class, 'download'])->name('qr.download');
             });
         });
     }

@@ -14,6 +14,9 @@ final class EpsWriter implements QrWriter
     /**
      * The side of a module in points.
      */
+    // PCOV attributes no coverage to a constant's initializer, so Pest selects no test for its mutants and
+    // reports them uncovered. A changed value is observable, and the size assertions in `QrFilesTest` pin it.
+    // @pest-mutate-ignore:IncrementInteger,DecrementInteger
     public const int UNIT = 10;
 
     public function extension(): string
