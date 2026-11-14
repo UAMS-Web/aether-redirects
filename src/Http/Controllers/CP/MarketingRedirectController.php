@@ -17,6 +17,7 @@ use Statamic\Facades\User;
 use Statamic\Http\Controllers\CP\CpController;
 use UAMSWeb\Aether\Redirects\Exceptions\CodeGenerationException;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
+use UAMSWeb\Aether\Redirects\Services\QrRequestWriter;
 use UAMSWeb\Aether\Redirects\Services\RedirectCollisionDetector;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainList;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
@@ -156,7 +157,8 @@ class MarketingRedirectController extends CpController
         RedirectDomainStore $domainStore,
         RedirectCollisionDetector $detector,
         TrustedDestinationReader $trusted,
-        TaggedUrlRequestStore $taggedStore
+        TaggedUrlRequestStore $taggedStore,
+        QrRequestWriter $qrWriter
     ): JsonResponse {
         // A short link has its own permission and rules (UAMS-Web/aether-redirects#84).
         if ($request->boolean('short_link')) {
@@ -258,6 +260,22 @@ class MarketingRedirectController extends CpController
 
         if ($conflict !== null) {
             return $this->unprocessable('source', $this->conflictMessage($conflict));
+        }
+
+        // A request for a QR code saves the -QR redirect beside the vanity one (UAMS-Web/aether-redirects#14).
+        if ($request->boolean('qr')) {
+            $saved = $qrWriter->save($redirect, $this->collisionCandidates($store));
+
+            if (is_string($saved)) {
+                return $this->unprocessable('qr', $saved);
+            }
+
+            return response()->json([
+                'saved' => true,
+                'message' => $this->submittedMessage($redirect),
+                'redirect' => $saved['vanity'],
+                'qr' => $saved['qr'],
+            ], 201);
         }
 
         // Persist the redirect onto the shared default-site list as pending.
