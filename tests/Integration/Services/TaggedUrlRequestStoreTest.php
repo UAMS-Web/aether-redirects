@@ -224,3 +224,9 @@ it('writes a review to the entry file, and clears an earlier rejection reason on
         ->and($file)->toContain('tagged_url:')
         ->and($file)->not->toContain('Not yet');
 });
+
+it('reads a blank stored channel as no channel, and a number as the id it is', function (): void {
+    expect(TaggedUrlRequestStore::choices(['channel' => ''])->channel)->toBeNull()
+        ->and(TaggedUrlRequestStore::choices(['channel' => 'ch1'])->channel)->toBe('ch1')
+        ->and(TaggedUrlRequestStore::choices(['steps' => ['source' => 's1', 'medium' => 3]])->steps)->toBe(['source' => 's1']);
+});

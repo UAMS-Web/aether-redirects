@@ -313,19 +313,11 @@ final readonly class TaggedUrlRequestStore implements RedirectRequestStore
      * The text entries of a stored map.
      *
      * @param  mixed  $value  The stored value
-     * @return array<string, string> The entries whose key and value are text, in stored order
+     * @return array<array-key, string> The entries whose value is text, in stored order (a numeric key reads back as a number)
      */
     private static function texts(mixed $value): array
     {
-        $texts = [];
-
-        foreach (\is_array($value) ? $value : [] as $key => $text) {
-            if (\is_string($text)) {
-                $texts[(string) $key] = $text;
-            }
-        }
-
-        return $texts;
+        return array_filter(\is_array($value) ? $value : [], \is_string(...));
     }
 
     /**

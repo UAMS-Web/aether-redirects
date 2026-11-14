@@ -23,8 +23,14 @@ final readonly class TaggedUrlChoiceValidator
 {
     /**
      * The longest a request field or a custom value may be.
+     *
+     * A method rather than a constant: PCOV attributes no coverage to a constant's
+     * initializer, so a mutation run could not select a test for it.
      */
-    public const int MAX_LENGTH = 255;
+    public static function maxLength(): int
+    {
+        return 255;
+    }
 
     /**
      * @param  TaggedUrlLookupReader  $reader  Reads the host's lists, cascade and parameters
@@ -46,7 +52,7 @@ final readonly class TaggedUrlChoiceValidator
         $composer = $this->reader->composer();
         $parameters = $this->reader->parameterList();
 
-        // The request fields and lists the site's parameters read
+        // The request fields and lists the site's parameters read, as sets
         $readFields = [];
         $readLists = [];
 
@@ -58,12 +64,14 @@ final readonly class TaggedUrlChoiceValidator
             }
         }
 
+        $readFields = array_flip($readFields);
+        $readLists = array_flip($readLists);
         $errors = [];
 
         // Request fields: bounded text, by the handles a parameter reads
         $fields = [];
 
-        foreach (array_unique($readFields) as $handle) {
+        foreach (array_keys($readFields) as $handle) {
             $value = $input[$handle] ?? null;
 
             if ($value === null) {
@@ -79,7 +87,7 @@ final readonly class TaggedUrlChoiceValidator
 
         // A field the form once carried that no parameter reads now
         foreach (TaggedUrlRequestStore::requestFields() as $handle) {
-            if (! \in_array($handle, $readFields, true) && $this->isFilled($input[$handle] ?? null)) {
+            if (! isset($readFields[$handle]) && $this->isFilled($input[$handle] ?? null)) {
                 $errors[$handle] = [__('No tagged URL parameter reads this field.')];
             }
         }
@@ -89,10 +97,10 @@ final readonly class TaggedUrlChoiceValidator
         $channelId = null;
 
         if ($this->isFilled($channel)) {
-            if (! \is_string($channel) || ! \in_array($channel, $this->ids($composer->channelOptions()), true)) {
+            if (! \is_string($channel) || ! isset($this->ids($composer->channelOptions())[$channel])) {
                 $errors['channel'] = [__('The channel is not one this site offers.')];
             } else {
-                $channelId = trim($channel);
+                $channelId = $channel;
             }
         }
 
@@ -111,7 +119,7 @@ final readonly class TaggedUrlChoiceValidator
 
             $offered = $composer->optionsFor($step, new TaggedUrlRequest($destination, $channelId, $steps));
 
-            if (! \is_string($chosen[$step]) || ! \in_array($chosen[$step], $this->ids($offered), true)) {
+            if (! \is_string($chosen[$step]) || ! isset($this->ids($offered)[$chosen[$step]])) {
                 $errors['steps.'.$step] = [__('This choice is not offered at this step.')];
             } else {
                 $steps[$step] = $chosen[$step];
@@ -128,9 +136,9 @@ final readonly class TaggedUrlChoiceValidator
                 continue;
             }
 
-            if (! \in_array($listId, $readLists, true)) {
+            if (! isset($readLists[$listId])) {
                 $errors['lists.'.$listId] = [__('No tagged URL parameter reads this list.')];
-            } elseif (! \is_string($optionId) || ! \in_array($optionId, $this->ids($catalog->options($listId)), true)) {
+            } elseif (! \is_string($optionId) || ! isset($this->ids($catalog->options((string) $listId))[$optionId])) {
                 $errors['lists.'.$listId] = [__('This choice is not in the list.')];
             } else {
                 $lists[$listId] = $optionId;
@@ -139,9 +147,10 @@ final readonly class TaggedUrlChoiceValidator
 
         // Custom values sit beside a step or list choice
         $custom = [];
+        $customKeys = $readLists + array_flip(TaggedUrlLookup::steps());
 
         foreach ($this->map($input['custom_values'] ?? null, 'custom_values', $errors) as $key => $value) {
-            if (! \in_array($key, [...TaggedUrlLookup::steps(), ...$readLists], true)) {
+            if (! isset($customKeys[$key])) {
                 $errors['custom_values.'.$key] = [__('No tagged URL parameter reads this value.')];
 
                 continue;
@@ -179,13 +188,13 @@ final readonly class TaggedUrlChoiceValidator
 
         $value = trim($value);
 
-        if (mb_strlen($value) > self::MAX_LENGTH) {
-            $errors[$name] = [__('This may not be longer than :max characters.', ['max' => self::MAX_LENGTH])];
-
-            return null;
+        if (mb_strlen($value) <= self::maxLength()) {
+            return $value;
         }
 
-        return $value;
+        $errors[$name] = [__('This may not be longer than :max characters.', ['max' => self::maxLength()])];
+
+        return null;
     }
 
     /**
@@ -194,7 +203,7 @@ final readonly class TaggedUrlChoiceValidator
      * @param  mixed  $value  The submitted value
      * @param  string  $name  The name the error is filed under
      * @param  array<string, list<array<mixed>|string>>  $errors  The errors so far
-     * @return array<string, mixed> The map
+     * @return array<array-key, mixed> The map, by the keys it was submitted with
      */
     private function map(mixed $value, string $name, array &$errors): array
     {
@@ -208,13 +217,7 @@ final readonly class TaggedUrlChoiceValidator
             return [];
         }
 
-        $map = [];
-
-        foreach ($value as $key => $entry) {
-            $map[(string) $key] = $entry;
-        }
-
-        return $map;
+        return $value;
     }
 
     /**
@@ -224,17 +227,21 @@ final readonly class TaggedUrlChoiceValidator
      */
     private function isFilled(mixed $value): bool
     {
-        return ! in_array($value, [null, '', []], true) && (! \is_string($value) || trim($value) !== '');
+        if (\is_string($value)) {
+            return trim($value) !== '';
+        }
+
+        return $value !== null && $value !== [];
     }
 
     /**
-     * The ids of options.
+     * The ids of options, as a set.
      *
      * @param  list<LookupOption>  $options  The options
-     * @return list<string> Their ids
+     * @return array<string, int> Their ids, as keys
      */
     private function ids(array $options): array
     {
-        return array_map(static fn (LookupOption $option): string => $option->id, $options);
+        return array_flip(array_map(static fn (LookupOption $option): string => $option->id, $options));
     }
 }
