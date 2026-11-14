@@ -80,7 +80,7 @@ it('opens the request form for a user who can request only tagged URLs, set to a
     test()->get(mrdRoute('marketing-redirects.create'))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('canCreateRedirects', false)
+            ->where('canRequestVanity', false)
             ->where('shortLinkHost', null)
             ->where('taggedAvailable', true));
 });
