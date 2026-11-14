@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import Create from '../../resources/js/pages/MarketingRedirectCreate.vue';
