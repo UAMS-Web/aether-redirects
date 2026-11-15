@@ -24,6 +24,7 @@ use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectRequestStore;
 use UAMSWeb\Aether\Redirects\Services\TaggedUrlChoiceValidator;
 use UAMSWeb\Aether\Redirects\Services\TaggedUrlRequestStore;
+use UAMSWeb\Aether\Redirects\Services\TaggedVanityIssuer;
 use UAMSWeb\Aether\Redirects\Services\TrustedDestinationReader;
 use UAMSWeb\Aether\Redirects\Support\BackHalf;
 use UAMSWeb\Aether\Redirects\Support\CreativeServices;
@@ -32,6 +33,7 @@ use UAMSWeb\Aether\Redirects\Support\RandomCode;
 use UAMSWeb\Aether\Redirects\Support\RedirectHosts;
 use UAMSWeb\Aether\Redirects\Support\RedirectStatus;
 use UAMSWeb\Aether\Redirects\Support\ShortCode;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 use UAMSWeb\Aether\Redirects\Support\TypedBackHalf;
 
 /**
@@ -215,6 +217,14 @@ class MarketingRedirectController extends CpController
 
         if ($hostError instanceof JsonResponse) {
             return $hostError;
+        }
+
+        // The cascade's choices are checked against the typed destination, as a tagged-only request's are,
+        // and kept until approval composes the destination from them (UAMS-Web/aether-redirects#125).
+        $choices = $validator->validate($redirect->destination, $request->boolean('suppress_utm'), $request->all());
+
+        if ($this->hasChoices($choices)) {
+            $redirect = $redirect->withTaggedChoices($choices);
         }
 
         // The domain's entries hold a domain request; the global holds a main-site one.
@@ -448,7 +458,8 @@ class MarketingRedirectController extends CpController
         string $redirect,
         MarketingRedirectStore $globalStore,
         RedirectDomainStore $domainStore,
-        TaggedUrlRequestStore $taggedStore
+        TaggedUrlRequestStore $taggedStore,
+        TaggedVanityIssuer $issuer
     ): JsonResponse {
         // Only approvers may approve, and never their own request.
         $this->authorize(self::APPROVE_PERMISSION);
@@ -463,7 +474,8 @@ class MarketingRedirectController extends CpController
 
         // A tagged URL composed with no parameters defined would be the bare destination, issued for good;
         // refuse and leave the request pending until the site defines them (UAMS-Web/aether-redirects#18).
-        if ($store instanceof TaggedUrlRequestStore && ! TaggedUrlRequestStore::canIssue()) {
+        // A vanity request made with tagged URL choices waits for the same thing (UAMS-Web/aether-redirects#125).
+        if (($store instanceof TaggedUrlRequestStore || TaggedVanityIssuer::carriesChoices($pending)) && ! TaggedUrlRequestStore::canIssue()) {
             return $this->unprocessable('tagged_url', __('Tagged URL parameters are not set up on this site, so no tagged URL can be issued yet.'));
         }
 
@@ -479,7 +491,7 @@ class MarketingRedirectController extends CpController
         // unreachable: the CP auth middleware and the permission gate above both
         // need a signed-in user, so the id is never null here.
         // @pest-mutate-ignore:EmptyStringToNotEmpty
-        $row = $store->approve($redirect, $this->currentUserId() ?? '');
+        $row = $store->approve($redirect, $this->currentUserId() ?? '', $issuer->destinationFor(...));
 
         return response()->json([
             'saved' => true,
@@ -938,7 +950,7 @@ class MarketingRedirectController extends CpController
         $currentUserId = $this->currentUserId();
 
         // Map each pending redirect row to the shape the review screen consumes.
-        $redirects = array_map(static function (array $row) use ($currentUserId): array {
+        $redirects = array_map(static function (array $row) use ($currentUserId, $taggedStore): array {
             // The '' fallback cannot render: a row without an id fails the action
             // URL generation below either way, and every row the store writes
             // carries an id.
@@ -959,6 +971,7 @@ class MarketingRedirectController extends CpController
                 'valid_until' => \is_string($row['valid_until'] ?? null) ? $row['valid_until'] : null,
                 'creative_services' => ($row['creative_services'] ?? false) === true,
                 'job_number' => \is_string($row['job_number'] ?? null) ? $row['job_number'] : null,
+                'tagged' => TaggedVanityIssuer::carriesChoices($row) ? self::taggedChoicesPayload($row, $taggedStore) : null,
                 'can_review' => $submittedBy === null || $submittedBy !== $currentUserId,
                 'approve_url' => cp_route('marketing-redirects.approve', ['redirect' => $id]),
                 'reject_url' => cp_route('marketing-redirects.reject', ['redirect' => $id]),
@@ -966,6 +979,31 @@ class MarketingRedirectController extends CpController
         }, [...$globalStore->pending(), ...$domainStore->pending()]);
 
         return [...$redirects, ...array_map(fn (array $row): array => $this->taggedPayload($row, $currentUserId, $taggedStore), $taggedStore->pending())];
+    }
+
+    /**
+     * The tagged URL choices a pending vanity request carries, for the approver to confirm
+     * (UAMS-Web/aether-redirects#125).
+     *
+     * @param  array<string, mixed>  $row  The stored request
+     * @param  TaggedUrlRequestStore  $taggedStore  The store that reads the choices' labels
+     * @return array{choices: list<array{name: string, option: string, custom: string|null}>, fields: array<array-key, string>, suppress_utm: bool}
+     */
+    private static function taggedChoicesPayload(array $row, TaggedUrlRequestStore $taggedStore): array
+    {
+        $choices = TaggedUrlRequest::fromStored($row[MarketingRedirect::TAGGED_CHOICES_FIELD]);
+
+        return ['choices' => $taggedStore->summaryOf($choices), 'fields' => $choices->fields, 'suppress_utm' => $choices->suppressUtm];
+    }
+
+    /**
+     * Whether a validated submission carries any choice, so a vanity request with none is saved as it always was.
+     *
+     * @param  TaggedUrlRequest  $choices  The validated choices
+     */
+    private function hasChoices(TaggedUrlRequest $choices): bool
+    {
+        return $choices->channel !== null || $choices->steps !== [] || $choices->lists !== [] || $choices->custom !== [] || $choices->fields !== [];
     }
 
     /**

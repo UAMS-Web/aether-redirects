@@ -151,3 +151,15 @@ Oldest first, one entry per closed decision, so **a new entry is appended to the
 **Rejected.** Storing each request field as a field of the entry, as the three fixed ones were: a site-defined handle could collide with a workflow field. Dropping a field no parameter reads: a submission that meant to set it would be saved without it and nobody told. Copying the option entries into the request: it would let a retired option's text outlive the list that retired it, for a record the issued URL already is.
 
 **Companion.** `UAMS-Web/aether-redirects#119`, part of `UAMS-Web/aether-redirects#26`.
+
+## 2026-11-14: A vanity request carries the tagged URL cascade, and the system fills the vanity and QR values, issuing one URL per redirect (#125)
+
+**Decision.** A vanity request on either store (the `redirects` global and `redirect_domains`) is submitted with the same cascade choices as a tagged-only request, checked against the typed destination by the same validator, and kept in a `tagged_choices` field until approval. Approval composes the tagged URL from the destination as typed and the choices, stores it as the redirect's destination, and does not compose it again, so a later change to a list or a parameter leaves it as issued. Two request field handles are the system's to fill and are refused when typed: `vanity_url`, the vanity domain and back-half lowercased and percent-encoded (`uams.info%2Fwalk-qr`), blank for a main-site request or when the request leaves the `utm_*` parameters off; and `qr_code`, `false` on the vanity redirect and `true` on its `-QR` redirect. A request with a QR code is issued two URLs, one for each redirect. A vanity request made with no choices saves and approves as it did.
+
+**Why.** The spreadsheet the tagged URLs were built in carries the vanity URL and a QR flag as columns, so the two values belong to the redirect, not to what the requester types, and the QR redirect's own back-half is what its scans should be counted under. Composing at approval, from stored choices, lets a pair carry two different URLs and keeps an issued URL a record rather than a view of current lists.
+
+**Rejected.** Composing on every serve or save: an issued URL would change with the lists. Letting the requester type the vanity value: it could disagree with the redirect it names. One URL for the pair with the QR flag repointed from the vanity side: the QR redirect could not carry its own back-half.
+
+**Residue.** The sync that repoints a `-QR` redirect from its vanity redirect on every save skips a pair requested with tagged choices, so a later Control Panel edit to a tagged pair's destination does not reach the other side.
+
+**Companion.** `UAMS-Web/aether-redirects#125`, part of `UAMS-Web/aether-redirects#26`; builds on `UAMS-Web/aether-redirects#120`.

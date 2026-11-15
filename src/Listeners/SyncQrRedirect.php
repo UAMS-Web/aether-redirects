@@ -7,6 +7,7 @@ namespace UAMSWeb\Aether\Redirects\Listeners;
 use Statamic\Entries\Entry as StatamicEntry;
 use Statamic\Events\EntrySaving;
 use UAMSWeb\Aether\Redirects\Services\QrPairFinder;
+use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\QrRedirect;
 
 /**
@@ -29,6 +30,12 @@ final readonly class SyncQrRedirect
         $vanity = $event->entry;
 
         if (! $vanity instanceof StatamicEntry) {
+            return;
+        }
+
+        // A pair requested with tagged URL choices holds a destination composed for each side, which
+        // repointing one from the other would undo (UAMS-Web/aether-redirects#125)
+        if (is_array($vanity->get(MarketingRedirect::TAGGED_CHOICES_FIELD))) {
             return;
         }
 

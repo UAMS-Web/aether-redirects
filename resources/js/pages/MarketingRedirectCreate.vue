@@ -119,12 +119,18 @@ const legacyFields = ['utm_campaign', 'utm_id', 'utm_marketing_tactic'];
 // Whether the form asks for a tagged URL alone.
 const taggedOnly = computed(() => form.value.kind === 'tagged');
 
+// Whether the cascade's choices are shown: always for a tagged request, and for a vanity request when the site has lookup data.
+const showsCascade = computed(() => taggedOnly.value || (props.taggedAvailable && hasCascade.value));
+
 // The submission for the chosen kind of request.
 function payload() {
     const body = Object.fromEntries(fieldsByKind[form.value.kind].map((field) => [field, form.value[field]]));
 
     if (form.value.kind === 'tagged') {
         Object.assign(body, taggedChoices());
+    } else if (hasCascade.value) {
+        // A vanity request on a site with lookup data carries the same choices (UAMS-Web/aether-redirects#125)
+        Object.assign(body, taggedChoices(), { suppress_utm: form.value.suppress_utm });
     }
 
     return body;
@@ -239,17 +245,15 @@ async function loadCascade() {
 watch(
     () => JSON.stringify([form.value.channel, form.value.steps, form.value.lists]),
     () => {
-        if (form.value.kind === 'tagged') {
-            loadCascade();
-        }
+        loadCascade();
     },
 );
 
-// Choosing a tagged request asks for the cascade, and does so once.
+// The cascade is asked for once, whichever kind of request is chosen.
 watch(
     () => form.value.kind,
-    (kind) => {
-        if (kind === 'tagged' && !cascadeLoaded.value) {
+    () => {
+        if (!cascadeLoaded.value) {
             loadCascade();
         }
     },
@@ -469,7 +473,7 @@ async function submit() {
                     <p v-if="errorFor('destination')" class="mt-1 text-xs text-red-600" v-text="errorFor('destination')" />
                 </div>
 
-                <template v-if="taggedOnly">
+                <template v-if="showsCascade">
                     <div v-if="cascade.channel.length">
                         <label class="mb-1 block text-sm font-medium" for="mr-channel">{{ __('Channel') }}</label>
                         <select id="mr-channel" v-model="form.channel" :class="inputClass">

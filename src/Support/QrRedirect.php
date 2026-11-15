@@ -158,6 +158,7 @@ final class QrRedirect
             creativeServices: $from->creativeServices,
             jobNumber: $from->jobNumber,
             qrRole: $role,
+            taggedChoices: $from->taggedChoices,
         );
     }
 }

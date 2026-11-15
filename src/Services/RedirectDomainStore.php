@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace UAMSWeb\Aether\Redirects\Services;
 
+use Closure;
 use Illuminate\Support\Collection;
 use RuntimeException;
 use Statamic\Entries\Entry as StatamicEntry;
@@ -109,13 +110,13 @@ final class RedirectDomainStore implements RedirectRequestStore
      * @param  string  $reviewerId  The Control Panel user id approving it.
      * @return array<string, mixed>|null The updated row, or null when no entry has that id.
      */
-    public function approve(string $id, string $reviewerId): ?array
+    public function approve(string $id, string $reviewerId, ?Closure $destinationFor = null): ?array
     {
         return $this->review($id, [
             'status' => RedirectStatus::Approved->value,
             'reviewed_by' => $reviewerId,
             'rejection_reason' => null,
-        ]);
+        ], $destinationFor);
     }
 
     /**
@@ -142,7 +143,7 @@ final class RedirectDomainStore implements RedirectRequestStore
      * @param  array<string, mixed>  $fields  The fields to set.
      * @return array<string, mixed>|null The updated row, or null when no entry has that id.
      */
-    private function review(string $id, array $fields): ?array
+    private function review(string $id, array $fields, ?Closure $destinationFor = null): ?array
     {
         $entry = $this->entry($id);
 
@@ -150,7 +151,7 @@ final class RedirectDomainStore implements RedirectRequestStore
             return null;
         }
 
-        $entry->merge($fields);
+        $entry->merge([...$fields, ...$this->issued($entry, $destinationFor)]);
         $entry->save();
 
         // A vanity redirect with a QR code is reviewed together with its -QR redirect (UAMS-Web/aether-redirects#14).
@@ -158,7 +159,7 @@ final class RedirectDomainStore implements RedirectRequestStore
 
         // One already reviewed, by hand, keeps its own verdict.
         if ($companion instanceof StatamicEntry && RedirectStatus::fromRow(self::rowFor($companion, RedirectDomainList::records())) === RedirectStatus::Pending) {
-            $companion->merge($fields);
+            $companion->merge([...$fields, ...$this->issued($companion, $destinationFor)]);
             $companion->save();
         }
 
@@ -173,6 +174,20 @@ final class RedirectDomainStore implements RedirectRequestStore
      *
      * @param  string  $id  The entry id.
      */
+    /**
+     * The destination to issue for an entry, as a field to merge, or nothing.
+     *
+     * @param  StatamicEntry  $entry  The entry being approved
+     * @param  Closure|null  $destinationFor  Given the stored row, the destination or null
+     * @return array<string, string> `target_url` when a destination is issued, else empty
+     */
+    private function issued(StatamicEntry $entry, ?Closure $destinationFor): array
+    {
+        $destination = $destinationFor instanceof Closure ? $destinationFor(self::rowFor($entry, RedirectDomainList::records())) : null;
+
+        return \is_string($destination) ? ['target_url' => $destination] : [];
+    }
+
     private function entry(string $id): ?StatamicEntry
     {
         $entry = Entry::find($id);

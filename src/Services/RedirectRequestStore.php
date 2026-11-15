@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace UAMSWeb\Aether\Redirects\Services;
 
+use Closure;
+
 /**
  * A place marketing redirect requests are kept and reviewed
  * (UAMS-Web/aether-redirects#83).
@@ -42,9 +44,10 @@ interface RedirectRequestStore
      *
      * @param  string  $id  The row id.
      * @param  string  $reviewerId  The Control Panel user id approving it.
+     * @param  Closure|null  $destinationFor  Given a stored row, the destination to issue for it or null to keep the one it has (UAMS-Web/aether-redirects#125)
      * @return array<string, mixed>|null The updated row, or null when no row has that id.
      */
-    public function approve(string $id, string $reviewerId): ?array;
+    public function approve(string $id, string $reviewerId, ?Closure $destinationFor = null): ?array;
 
     /**
      * Reject a pending row, retaining the reason.

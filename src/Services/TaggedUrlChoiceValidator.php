@@ -57,7 +57,7 @@ final readonly class TaggedUrlChoiceValidator
         $readLists = [];
 
         foreach ($parameters as $parameter) {
-            if ($parameter->from === TaggedUrlParameter::FROM_REQUEST_FIELD) {
+            if ($parameter->from === TaggedUrlParameter::FROM_REQUEST_FIELD && ! TaggedUrlParameter::isReserved($parameter->source)) {
                 $readFields[] = $parameter->source;
             } elseif ($parameter->from === TaggedUrlParameter::FROM_LIST) {
                 $readLists[] = $parameter->source;
@@ -82,6 +82,13 @@ final readonly class TaggedUrlChoiceValidator
 
             if ($text !== null && $text !== '') {
                 $fields[$handle] = $text;
+            }
+        }
+
+        // A value the system fills is never the requester's to type
+        foreach (TaggedUrlParameter::reservedFields() as $handle) {
+            if ($this->isFilled($input[$handle] ?? null)) {
+                $errors[$handle] = [__('The system fills this value.')];
             }
         }
 
