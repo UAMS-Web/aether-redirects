@@ -8,7 +8,7 @@ use UAMSWeb\Aether\Redirects\Support\TaggedUrlComposer;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlParameter;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 
-covers(TaggedUrlComposer::class, TaggedUrlRequest::class);
+covers(TaggedUrlComposer::class, TaggedUrlRequest::class, TaggedUrlParameter::class);
 
 /**
  * Unit tests for {@see TaggedUrlComposer}: walking the cascade and composing a

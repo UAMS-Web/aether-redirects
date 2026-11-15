@@ -15,15 +15,20 @@ use Statamic\Facades\Stache;
 use Statamic\Globals\GlobalSet as StatamicGlobalSet;
 use Symfony\Component\HttpFoundation\Response;
 use UAMSWeb\Aether\Redirects\Http\Controllers\CP\MarketingRedirectController;
+use UAMSWeb\Aether\Redirects\Listeners\SyncQrRedirect;
 use UAMSWeb\Aether\Redirects\Services\MarketingRedirectStore;
 use UAMSWeb\Aether\Redirects\Services\RedirectDomainStore;
+use UAMSWeb\Aether\Redirects\Services\TaggedUrlChoiceValidator;
 use UAMSWeb\Aether\Redirects\Services\TaggedVanityIssuer;
+use UAMSWeb\Aether\Redirects\Support\MarketingRedirect;
 use UAMSWeb\Aether\Redirects\Support\TaggedUrlLookup;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlParameter;
+use UAMSWeb\Aether\Redirects\Support\TaggedUrlRequest;
 use UAMSWeb\Aether\Redirects\Tests\Support\IsolatesStache;
 
 uses(IsolatesStache::class);
 
-covers(MarketingRedirectController::class, TaggedVanityIssuer::class);
+covers(MarketingRedirectController::class, TaggedVanityIssuer::class, MarketingRedirectStore::class, RedirectDomainStore::class, TaggedUrlChoiceValidator::class, SyncQrRedirect::class, MarketingRedirect::class, TaggedUrlParameter::class, TaggedUrlRequest::class);
 
 /**
  * HTTP tests for a vanity request made with tagged URL choices (UAMS-Web/aether-redirects#125, part
@@ -188,6 +193,35 @@ it('composes no vanity value for a row on the main site', function (): void {
 
     expect(tvQuery($url))->not->toContain('utm_vanity=');
 });
+
+it('names the vanity value only for a row with both a domain and a back-half', function (string $host, string $source, string $expected): void {
+    $url = app(TaggedVanityIssuer::class)->destinationFor([
+        'host' => $host,
+        'source' => $source,
+        'tagged_choices' => ['destination' => 'https://www.uams.edu/flu', 'channel' => 'ch-social'],
+    ]);
+
+    expect(tvQuery($url))->toContain($expected);
+})->with([
+    'both' => ['uams.info', '/Walk', 'utm_vanity=uams.info%2Fwalk'],
+    'a bare slash for a back-half' => ['uams.info', '/', 'utm_qr=false'],
+    'no back-half' => ['uams.info', '', 'utm_qr=false'],
+    'no domain' => ['', '/walk', 'utm_qr=false'],
+]);
+
+it('leaves the vanity value out when the domain or back-half is missing', function (string $host, string $source): void {
+    $url = app(TaggedVanityIssuer::class)->destinationFor([
+        'host' => $host,
+        'source' => $source,
+        'tagged_choices' => ['destination' => 'https://www.uams.edu/flu', 'channel' => 'ch-social'],
+    ]);
+
+    expect(tvQuery($url))->not->toContain('utm_vanity');
+})->with([
+    'a bare slash' => ['uams.info', '/'],
+    'no back-half' => ['uams.info', ''],
+    'no domain' => ['', '/walk'],
+]);
 
 it('issues nothing for a row that carries no choices', function (): void {
     expect(app(TaggedVanityIssuer::class)->destinationFor(['host' => 'uams.info', 'source' => '/x']))->toBeNull();
