@@ -58,7 +58,9 @@ final readonly class TaggedUrlParameter
      */
     public static function isReserved(string $handle): bool
     {
-        return \in_array($handle, self::reservedFields(), true);
+        $reserved = self::reservedFields();
+
+        return $handle === $reserved['vanity'] || $handle === $reserved['qr'];
     }
 
     /**

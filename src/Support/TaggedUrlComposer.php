@@ -172,7 +172,7 @@ final readonly class TaggedUrlComposer
         $reserved = TaggedUrlParameter::reservedFields();
 
         if ($handle === $reserved['vanity']) {
-            return mb_strtolower(trim($request->vanity ?? ''));
+            return mb_strtolower($request->vanity ?? '');
         }
 
         if ($handle === $reserved['qr']) {

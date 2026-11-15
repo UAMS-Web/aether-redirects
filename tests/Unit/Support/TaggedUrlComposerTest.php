@@ -219,6 +219,12 @@ it('round-trips a request through its stored form and ignores what is not text',
         ->toEqual(new TaggedUrlRequest('', null, ['b' => 'x']));
 });
 
+it('reads a stored channel only when it is non-empty text', function (): void {
+    expect(TaggedUrlRequest::fromStored(['channel' => ''])->channel)->toBeNull()
+        ->and(TaggedUrlRequest::fromStored(['channel' => 'ch-social'])->channel)->toBe('ch-social')
+        ->and(TaggedUrlRequest::fromStored(['channel' => 5])->channel)->toBeNull();
+});
+
 it('fills the vanity and QR values the system owns, lowercased, and never asks for them', function (): void {
     $composer = taggedExampleComposer([
         new TaggedUrlParameter('utm_vanity', TaggedUrlParameter::FROM_REQUEST_FIELD, TaggedUrlParameter::reservedFields()['vanity']),
