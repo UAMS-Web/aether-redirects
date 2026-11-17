@@ -178,6 +178,26 @@ it('does not collide the same path on another host or on the main site', functio
         ->and($detector->firstConflict('/flu', new ValidityWindow, [collisionRow('/flu')], 'uams.info'))->toBeNull();
 });
 
+it('keeps scanning past a row on another host to reach a same-host conflict', function (): void {
+    $detector = new RedirectCollisionDetector;
+
+    /** @var array<string, mixed> $conflict */
+    $conflict = $detector->firstConflict(
+        '/flu',
+        new ValidityWindow,
+        [
+            hostedCollisionRow('uams.health', '/flu'),
+            collisionRow('/flu'),
+            hostedCollisionRow('uams.info', '/flu', null, '2026-06-30'),
+        ],
+        'uams.info',
+    );
+
+    expect($conflict)->not->toBeNull()
+        ->and($conflict['host'])->toBe('uams.info')
+        ->and($conflict['valid_until'])->toBe('2026-06-30');
+});
+
 it('collides the same path on the same host, whatever the case of the host', function (): void {
     $detector = new RedirectCollisionDetector;
 
