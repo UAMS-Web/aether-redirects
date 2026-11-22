@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// cspell:ignore redefinable usort
+
 /**
  * Fail when Patchwork changes the line count of a file the mutation run covers.
  *
