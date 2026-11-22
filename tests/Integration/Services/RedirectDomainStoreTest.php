@@ -80,6 +80,21 @@ function domainStoreRequest(array $overrides = []): MarketingRedirect
 }
 
 /**
+ * The source of each row, in the order the rows came.
+ *
+ * @param  list<array<string, mixed>>  $rows
+ * @return list<string>
+ */
+function domainStoreSources(array $rows): array
+{
+    return array_map(static function (array $row): string {
+        Assert::assertIsString($row['source']);
+
+        return $row['source'];
+    }, $rows);
+}
+
+/**
  * The status of a stored row.
  *
  * @param  array<string, mixed>|null  $row
@@ -131,6 +146,45 @@ it('lists only pending rows, in a list', function (): void {
         ->and($rows[0]['id'])->toBe($pending['id'])
         ->and($store->all())->toHaveCount(3);
 });
+
+it('lists every entry in title order, whatever order they were created in', function (): void {
+    $store = new RedirectDomainStore;
+
+    // The middle title is created last, so creation order and title order differ
+    foreach (['/a', '/c', '/b'] as $source) {
+        $store->create(domainStoreRequest(['source' => $source]));
+    }
+
+    expect(domainStoreSources($store->all()))->toBe(['/a', '/b', '/c']);
+});
+
+it('lists pending rows in title order with list keys', function (): void {
+    $store = new RedirectDomainStore;
+
+    foreach (['/a', '/c', '/b'] as $source) {
+        $store->create(domainStoreRequest(['source' => $source]));
+    }
+
+    $rows = $store->pending();
+
+    expect(array_keys($rows))->toBe([0, 1, 2])
+        ->and(domainStoreSources($rows))->toBe(['/a', '/b', '/c']);
+});
+
+it('orders two titles that differ only in letter case as the installed Statamic does', function (array $created): void {
+    $store = new RedirectDomainStore;
+
+    // Pinned against statamic/cms 6.40.0 (the locked version). The case-only pair compares equal, so the
+    // order they were created in decides; a change in how the Stache compares titles changes this
+    foreach ($created as $source) {
+        $store->create(domainStoreRequest(['source' => $source]));
+    }
+
+    expect(domainStoreSources($store->all()))->toBe($created);
+})->with([
+    'lower case first' => [['/flu', '/Flu']],
+    'upper case first' => [['/Flu', '/flu']],
+]);
 
 it('approves a pending entry, recording the reviewer and clearing a stale reason', function (): void {
     $store = new RedirectDomainStore;
