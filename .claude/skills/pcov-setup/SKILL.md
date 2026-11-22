@@ -22,7 +22,7 @@ description: >-
   Edit it there, not here; the next sync overwrites this copy.
   Delivered to this repository through the profile(s): pest.
 -->
-<!-- cspell:ignore codesign CODESIGNING dlopen dyld elif hardlink imagick Mathur's phpversion repoint Shivam Triaging -->
+<!-- cspell:ignore codesign CODESIGNING dlopen dyld elif hardlink imagick Mathur's phpversion redefinable repoint Shivam Triaging usort -->
 
 # Coverage driver for Pest mutation testing and coverage
 
@@ -96,7 +96,7 @@ Herd ships an Xdebug build for every PHP version it manages at `/Applications/He
 ```bash
 php -d zend_extension=/Applications/Herd.app/Contents/Resources/xdebug/xdebug-84-arm64.so \
     -d xdebug.mode=coverage \
-    vendor/bin/pest --mutate --covered-only --path=<source dir>/<File>.php
+    vendor/bin/pest --mutate --path=<source dir>/<File>.php
 ```
 
 Slower at collecting coverage than PCOV, and that is mostly not what a mutation run spends its time on (see the measurements above. This is the right first choice; build PCOV only if Route 1's coverage phase measurably hurts.
@@ -353,7 +353,7 @@ PCOV is set up in Herd's Windows `php84` as a per-machine install (the same shap
 - **From a linked git worktree**, even a relative `--path=<source dir>` can find 0 files. Scope to a **relative sub-path** of the changed class and bypass the convenience script:
 
   ```bash
-  vendor/bin/pest <test-file> --mutate --path=<source dir>/<Subdir> --class="<Namespace>\<Class>" --covered-only
+  vendor/bin/pest <test-file> --mutate --path=<source dir>/<Subdir> --class="<Namespace>\<Class>"
   ```
 
   Passing a test file narrows the initial run, which the timeout paragraph below says inflates false timeouts; read any `timeout` from this form as unverified.
@@ -417,11 +417,25 @@ PHP helpers ship under [`scripts/`](scripts/) with this skill and sync into ever
 | [`build-coverage-scope-csv.php`](scripts/build-coverage-scope-csv.php) | Reads `<source>` from `phpunit.xml` / `phpunit.xml.dist` and writes the three-pass tracker CSV (`file`, `pass1_touched`, `pass2_line_pct`, `pass3_mutation_clean`). That CSV is the inventory. |
 | [`publish-coverage-scope-comment.php`](scripts/publish-coverage-scope-comment.php) | Upserts a Markdown tracker comment on the repository's full-coverage issue from the CSV. It requires `--pass2-min=<N>` and exits 1 without it. It posts to the `origin` repository unless `--repo=<owner>/<name>` names another, and exits 1 when neither resolves. |
 | [`check-mutation-instrument.php`](scripts/check-mutation-instrument.php) | Whether a mutant child can actually launch on this machine, and whether an identical-copy child reaches test discovery through the invocation a run uses. Exit `0` only before trusting a mutate score; exit `1` means scores can fabricate kills (see below); exit `2` means the probe measured nothing. |
+| [`check-patchwork-lines.php`](scripts/check-patchwork-lines.php) | Whether Patchwork's rewrite changes the line count of a file the mutation run covers, which makes PCOV credit later lines to the wrong ones and hides mutants as uncovered. Exit `0` when every file keeps its length; `1` names each file that does not; `2` means the check could not run, including that its control cannot see the rewrite. |
 
 ```bash
 php .claude/skills/pcov-setup/scripts/build-coverage-scope-csv.php --pass1
 php .claude/skills/pcov-setup/scripts/check-mutation-instrument.php
+php .claude/skills/pcov-setup/scripts/check-patchwork-lines.php src
 ```
+
+### The Patchwork line-count check
+
+**Patchwork can shorten a file as it loads it, and a mutation run then reports mutants uncovered while nothing else fails.** When a repository's `patchwork.json` lists any `redefinable-internals`, Patchwork drops the line break before the first argument of a call to a callback-taking internal (`array_filter`, `array_map`, `usort` and the rest of its default list). The file PHP loads is then shorter than the source, so PCOV credits every later line to the line above it. In `UAMS-Web/UAMSWP-Find-a-Doc` this hid 282 mutants in one file (UAMS-Web/UAMSWP-Find-a-Doc#1459). The defect is reported upstream as antecedent/patchwork#230.
+
+`check-patchwork-lines.php` runs Patchwork's own string rewrite (its `transformString()` function) over each file and compares newline counts, so it needs no coverage driver and no test run. Name the files or directories the mutation run covers, or name none and it reads `<source>` from `phpunit.xml` (or `phpunit.xml.dist`), less its excludes. `--root=<dir>` points it at a repository root other than the one above the script.
+
+- **Who runs it:** every repository whose Unit suite loads Patchwork with a non-empty `redefinable-internals` list, as a plain CI job beside the mutation job. The exposure is the pair, so a repository that lists no internal, or does not load Patchwork, has nothing for it to read.
+- **Its control runs before any file is read:** a split `array_filter()` call must lose a line under the rewrite and the same call on one line must not. A run that cannot show both exits `2` and prints what `patchwork.json` lists, so a repository with no internals listed, or a Patchwork release that has stopped joining lines, is never read as clean.
+- **When it can go:** it stays until antecedent/patchwork#230 is fixed in a release the repository installs. The control is what says so: it exits `2` once the rewrite stops joining lines, and that is the signal to remove the job.
+- **What to do with a hit:** put the call Patchwork joins on one line, the way the file named in the report shows. The report counts the lines lost, so a fix is confirmed by a re-run reading `every file keeps its line count`.
+- **Measured:** antecedent/patchwork 2.2.3, PHP 8.4, Windows 11, in a scratch project with `redefinable-internals: ["array_filter"]` (UAMS-Web/uams-claude-skills#859): the split call loses one line, the one-line call none, and an empty internals list loses nothing. Other platforms and Patchwork releases are not measured here.
 
 ### Three-pass walk of the inventory
 
@@ -453,15 +467,15 @@ php .claude/skills/pcov-setup/scripts/build-coverage-scope-csv.php --pass3 --bat
 # Snowball order (smallest estimated mutant count first): not CSV order:
 php scripts/estimate-pass3-mutants.php --print
 node scripts/pass3-next.mjs
-composer mutate -- --class="App\\…\\Class" --covered-only --no-cache
+composer mutate -- --class="App\\…\\Class" --no-cache
 # then set pass3_mutation_clean on that row and re-publish the issue comment
 ```
 
 **The pass 2 floor is the repository's own, and the scripts carry no default for it.** `--pass3` in the CSV builder and every run of the publisher need `--pass2-min=<N>` and exit 1 naming it when it is missing; `--pass1`, `--pass2`, `--count` and `--skeleton-only` do not read it. A repository derives its value from its own finished pass 2 column: take the 25th percentile of the non-empty `pass2_line_pct` cells once pass 2 is done, record it on the coverage ticket, and pass that number every time. `uams-statamic` recorded `86.7` this way on `UAMS-Web/uams-statamic#255`; that is its value, not a starting point for another repository, whose bar would otherwise be selected by someone else's distribution and printed in the tracker comment as its own.
 
-**Pass 3 walks the snowball queue, not CSV order.** Eligible rows (`pass1=yes`, `pass2_line_pct` meeting the ticket floor (the `--pass2-min` value; `86.7` on UAMS-Web/uams-statamic#255), empty `pass3_mutation_clean`) are ranked ascending by estimated Pest mutant count via `php scripts/estimate-pass3-mutants.php` (writes `storage/app/pass3-snowball.json`; Pest `MutationGenerator` + default mutator set: a wall-time proxy for `--covered-only`). Pick the head with `node scripts/pass3-next.mjs`. Regenerate when the eligible set changes. When `est_mutants >= 200`, launch with `run-detached-mutate.mjs --parallel=6` (mutant workers inside one job).
+**Pass 3 walks the snowball queue, not CSV order.** Eligible rows (`pass1=yes`, `pass2_line_pct` meeting the ticket floor (the `--pass2-min` value; `86.7` on UAMS-Web/uams-statamic#255), empty `pass3_mutation_clean`) are ranked ascending by estimated Pest mutant count via `php scripts/estimate-pass3-mutants.php` (writes `storage/app/pass3-snowball.json`; Pest `MutationGenerator` + default mutator set: a wall-time proxy for the run). Pick the head with `node scripts/pass3-next.mjs`. Regenerate when the eligible set changes. When `est_mutants >= 200`, launch with `run-detached-mutate.mjs --parallel=6` (mutant workers inside one job).
 
-**After the snowball pass, confirm every `n/a (0 estimated mutants)` cell.** The estimator can under-count relative to a real `--covered-only` run (and the reverse: `est > 0` with only uncovered const-array items). Revisit each such row with a narrow `vendor/bin/pest … --mutate --covered-only` (or without `--covered-only` when diagnosing) and rewrite the cell to either `narrow yes; full pending`, `n/a (0 covered mutants)`, or `n/a (0 covered; N uncovered …)` with the measured counts; do not leave estimator-only wording as the closeout record.
+**After the snowball pass, confirm every `n/a (0 estimated mutants)` cell.** The estimator can under-count relative to a real run (and the reverse: `est > 0` with only uncovered const-array items). Revisit each such row with a narrow `vendor/bin/pest … --mutate`, run without `--covered-only` so the figure is the closing one, and rewrite the cell to either `narrow yes; full pending`, `n/a (0 covered mutants)`, or `n/a (0 covered; N uncovered …)` with the measured counts; do not leave estimator-only wording as the closeout record.
 
 **Pass 3 is single-flight on a machine.** Run **one** `--mutate` at a time in that worktree (and do not overlap it with a second mutate job or another heavy coverage/mutate job that shares the same tree). A second mutate in the same slot is what orphans mutant children and fabricates or aborts scores, measured on the UAMS-Web/uams-statamic#255 pass-3 wave when a competing parallel harden run killed an in-flight serial Currency mutate. Pest mutate `--parallel` *inside* that one job is allowed and does not violate single-flight.
 
@@ -490,7 +504,7 @@ Confirmed directly in `uamswp-migration-api`, isolated from Pest and from any re
 
 **What a Windows false kill looks like, and the control that shows it fixed.** Measured on Windows 11 with PHP 8.4, in a scratch clone of `UAMS-Web/aether-wordpress-importer-cleanup` (`UAMS-Web/uams-claude-skills#544`): a bare `vendor/bin/pest --mutate` over one 81-mutant class printed `Score: 100.00%` in 3.24 s, about 0.04 s per mutant, and a log line in `hasFinished()` showed all 81 children exiting 1 with empty output and the `'vendor' is not recognized` message. With `PHP_BINARY` prepended to the child command, the same class printed `79 tested, 2 untested`, `Score: 97.53%` in 93.83 s, the two untested mutants being the two control mutants (`UnwrapStrtolower`, `EmptyStringToNotEmpty`), identical to the Linux and macOS legs. The fix as carried in that repository was then shown on a pull request that changed only a comment in that file (`UAMS-Web/aether-wordpress-importer-cleanup#46`, closed unmerged): its Windows mutate leg reported the same 2 untested of 81, where Windows had scored 100.00% before. A repository adopting the patch can repeat that control: plant a mutant no test kills and expect it to survive on Windows as it does on Linux.
 
-**A Unit suite whose bootstrap loads Patchwork loses every child that scans a directory.** The `wordpress-plugin` template's `tests/bootstrap.php.dist` requires `vendor/antecedent/patchwork/Patchwork.php` for Brain Monkey. Patchwork and the plugin's mutation stream wrapper both replace `file://`, and a directory read through the pair fails with `readdir(): Argument #1 ($dir_handle) must be of type resource or null, true given` in `Patchwork\CodeManipulation\Stream`. A child that collects tests by scanning `tests/Unit` dies before any test, exits non-zero, and is scored as a kill, so a run with no test file named can report 100.00% on a suite that kills nothing. Naming the test file avoids the scan: `pest tests/Unit/SettingsTest.php --mutate --covered-only --path=<source file>`. The check above runs an identical-copy child through the repository's own invocation (add `--arg=<test file>` to match a run that names one) and exits `1`, naming the cause, when it dies; its control is the same child without the mutation variables, which must list tests. Measured on Windows 11 with Pest 5.3.0, pest-plugin-mutate 5.0.2 and Patchwork 2.2.3 in a one-class scratch project (default invocation 100.00% against 33.33% with the file named, on a test file weakened to leave two mutants alive); the original report was on macOS (UAMS-Web/uams-claude-skills#131). Whether a Feature suite is affected is not measured: it does not load Patchwork in the template.
+**A Unit suite whose bootstrap loads Patchwork loses every child that scans a directory.** The `wordpress-plugin` template's `tests/bootstrap.php.dist` requires `vendor/antecedent/patchwork/Patchwork.php` for Brain Monkey. Patchwork and the plugin's mutation stream wrapper both replace `file://`, and a directory read through the pair fails with `readdir(): Argument #1 ($dir_handle) must be of type resource or null, true given` in `Patchwork\CodeManipulation\Stream`. A child that collects tests by scanning `tests/Unit` dies before any test, exits non-zero, and is scored as a kill, so a run with no test file named can report 100.00% on a suite that kills nothing. Naming the test file avoids the scan: `pest tests/Unit/SettingsTest.php --mutate --path=<source file>`. The check above runs an identical-copy child through the repository's own invocation (add `--arg=<test file>` to match a run that names one) and exits `1`, naming the cause, when it dies; its control is the same child without the mutation variables, which must list tests. Measured on Windows 11 with Pest 5.3.0, pest-plugin-mutate 5.0.2 and Patchwork 2.2.3 in a one-class scratch project (default invocation 100.00% against 33.33% with the file named, on a test file weakened to leave two mutants alive); the original report was on macOS (UAMS-Web/uams-claude-skills#131). Whether a Feature suite is affected is not measured: it does not load Patchwork in the template.
 
 **A child that launches can still run nothing, and on Windows it did.** Further plugin defects produce false kills even once the child starts:
 
@@ -507,13 +521,15 @@ Confirmed directly in `uamswp-migration-api`, isolated from Pest and from any re
 
 ### The positive control: make the instrument show a survivor
 
-Run this whenever you have reason to distrust a result, not only when reviewing a stated survivor. Pick a mutant with exactly one covering test. Temporarily add `->skip(true, '<reason>')` to that test, and confirm the skip took with a plain (non-mutate) run showing it skipped rather than run. Re-run `--mutate --covered-only --path=<file>` scoped to that file; the mutant must now show as a survivor (`UNTESTED`), not an unchanged or still-passing score. Revert the test file from a copy made before editing it, never with the stash (see [`adversarial-review`](../../rules/adversarial-review.md)'s revert discipline. Treat any other outcome as a reason to distrust the whole run, not just that one mutant.
+Run this whenever you have reason to distrust a result, not only when reviewing a stated survivor. Pick a mutant with exactly one covering test. Temporarily add `->skip(true, '<reason>')` to that test, and confirm the skip took with a plain (non-mutate) run showing it skipped rather than run. Re-run `--mutate --path=<file>` scoped to that file; the mutant must now show as a survivor (`UNTESTED`), not an unchanged or still-passing score. Revert the test file from a copy made before editing it, never with the stash (see [`adversarial-review`](../../rules/adversarial-review.md)'s revert discipline. Treat any other outcome as a reason to distrust the whole run, not just that one mutant.
 
 **Both defects live in the plugin, so a `vendor/` is patched or it is not, and `composer install` does not re-patch an already-installed package.** A checkout whose `vendor/` predates a patch reports `Nothing to install` and stays unpatched while reporting the same plugin version. Where a repository guards its patches with a test, that test going red is the signal; otherwise re-run the check below.
 
 ```bash
 php .claude/skills/pcov-setup/scripts/check-mutation-instrument.php     # 0 = a mutant child launches and reaches a test, 1 = scores would be fabricated, 2 = nothing measured
 ```
+
+**The shared local CI runner runs this check before every `mutation` job, and stops the run when it fails** (UAMS-Web/uams-claude-skills#849), with two exceptions decided on UAMS-Web/uams-claude-skills#851, each run behind a warning. An exit `2` or a `NOT MEASURED` stops only a bare selection: where the job's `run` names its test files, the probe is given them as `--arg`, and the run goes ahead. Temporarily, a probe-child death in a repository whose `patches.lock.json` is absent or records no patch also goes ahead, until UAMS-Web/uams-claude-skills#857 removes that exception. A form that cannot launch without a launch guard always stops the run. The `local-ci` skill has the detail. The patch need not be on the plugin: in `UAMS-Web/UAMSWP-Find-a-Doc`, a `vendor/` without `patchwork-directory-wrapper.patch` killed every mutant child with exit 255 on a Patchwork `TypeError` during a directory read, the plugin scored each death as a kill, and the run reported 756 of 756 tested, 100%. The remedy the runner prints is `composer patches-repatch`, then this check again; there is no option that skips it. A run started by hand is not checked, so run the check first.
 
 ## Mutation cannot reach a class that is already loaded
 
