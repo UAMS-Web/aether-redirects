@@ -22,7 +22,7 @@ description: >-
   Edit it there, not here; the next sync overwrites this copy.
   Delivered to this repository through the profile(s): pest.
 -->
-<!-- cspell:ignore codesign CODESIGNING dlopen dyld elif hardlink imagick Mathur's phpversion repoint Shivam Triaging -->
+<!-- cspell:ignore codesign CODESIGNING dlopen dyld elif hardlink imagick Mathur's phpversion redefinable repoint Shivam Triaging usort -->
 
 # Coverage driver for Pest mutation testing and coverage
 
