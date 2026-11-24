@@ -85,8 +85,14 @@
         }
     },
     "scripts": {
-        "post-install-cmd": "@php -r \"is_file('scripts/setup-git-hooks.php') && require 'scripts/setup-git-hooks.php';\"",
-        "post-update-cmd": "@php -r \"is_file('scripts/setup-git-hooks.php') && require 'scripts/setup-git-hooks.php';\"",
+        "post-install-cmd": [
+            "@php -r \"is_file('scripts/setup-git-hooks.php') && require 'scripts/setup-git-hooks.php';\"",
+            "@php .claude/skills/upstream-patch-lifecycle/scripts/ensure-patches-applied.php"
+        ],
+        "post-update-cmd": [
+            "@php -r \"is_file('scripts/setup-git-hooks.php') && require 'scripts/setup-git-hooks.php';\"",
+            "@php .claude/skills/upstream-patch-lifecycle/scripts/ensure-patches-applied.php"
+        ],
         "test": "pest --parallel --testsuite=Unit,Integration",
         "test:tia": "pest --tia --locally",
         "test:serial": "pest --testsuite=Unit,Integration",
