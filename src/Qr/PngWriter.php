@@ -46,7 +46,9 @@ final class PngWriter implements QrWriter
 
         // A fill from any pixel of a blank image spreads over all of it, so another starting point paints the same pixels.
         // @pest-mutate-ignore:IncrementInteger
-        imagefill($image, 0, 0, 0xFFFFFF);
+        $start = 0;
+
+        imagefill($image, $start, $start, 0xFFFFFF);
 
         foreach ($matrix->darkModules() as [$x, $y]) {
             imagefilledrectangle($image, $x * $unit, $y * $unit, ($x + 1) * $unit - 1, ($y + 1) * $unit - 1, 0x000000);
