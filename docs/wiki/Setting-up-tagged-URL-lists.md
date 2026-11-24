@@ -1,4 +1,4 @@
-Written against v0.4.0, with the cascade endpoint of `main` after it (marked below).
+Written against v0.5.2.
 
 A tagged URL is a destination plus the campaign parameters a report reads. This page sets up the lists a requester chooses them from, and the parameters a tagged URL carries, so that editors add, change and retire entries in the Control Panel and no code changes. The add-on ships the mechanism and no data: its repository is public and the lists are the site's own content.
 
@@ -96,8 +96,8 @@ Two request field handles are filled by the add-on when a vanity URL is requeste
 
 | Handle | Value |
 | --- | --- |
-| `vanity_url` | The vanity domain and back-half of the redirect, lowercased and percent-encoded, such as `uams.info%2Fflu`. Blank on a main-site request and when the request leaves the `utm_*` parameters off. |
-| `qr_code` | `false` on the vanity redirect and `true` on its `-QR` redirect. Blank on a main-site request. |
+| `vanity_url` | The vanity domain and back-half, lowercased and percent-encoded, such as `uams.info%2Fflu`. Blank on a main-site request. Left off when the suppress option is on and the parameter's name starts with `utm_`. |
+| `qr_code` | `false` on the vanity redirect, on a main-site request and on any redirect without a QR code; `true` on its `-QR` redirect. |
 
 Add a parameter whose `source_type` is `request_field` and whose `request_field` is one of these handles, such as `utm_vanity` and `utm_qr`, to put the values on the URL. The vanity redirect and its `-QR` redirect are each issued their own URL when an approver approves the request, and a later change to a list or a parameter leaves both as issued.
 
@@ -132,27 +132,10 @@ The unit test `tests/Unit/Support/TaggedUrlWikiExampleTest.php` builds this exam
 
 The lists, the options and the parameters are ordinary Statamic collections and a global set, so the native permissions apply: whoever may edit those entries and that global may add, change and retire them. The add-on adds no permission for the lists. Defining a list-manager role is the site's content repository's job.
 
-## Tagged-only requests today
+## Requests that use the lists
 
-A request for a tagged URL alone is saved as an entry of `tagged_url_requests` and issued when an approver approves it. The issued URL is stored on the request, so a later change to a list or a parameter does not change a URL already issued. Today the request carries the destination, `utm_campaign`, `utm_id`, `utm_marketing_tactic` and the suppress flag, so a site whose standard parameters read steps gets those parameters left out until the cascade choices are saved.
+A request for a tagged URL alone is saved as an entry of `tagged_url_requests`, and a vanity request on a site with lookup data carries the same choices. The request stores the channel, the option chosen at each step, the options chosen from other lists, the typed custom values and the request field values, as ids and text only. Approval composes the URL from them and stores it, so a later change to a list or a parameter does not change a URL already issued. A choice the cascade does not offer, or an unread list or value, is refused when the request is submitted. [Requesting a tagged URL](Requesting-a-tagged-URL.md) walks through the request.
 
-## Reading the cascade from a page (unreleased)
+## Reading the cascade from a page
 
-Since the release after v0.4.0, a signed-in user who may request a tagged URL can read the cascade as JSON, which the request form uses to narrow each list as choices are made:
-
-```text
-GET <cp>/redirects/marketing/tagged-url/cascade?channel=<option id>&steps[source]=<option id>
-```
-
-The route is named `marketing-redirects.tagged-url.cascade`. The query takes `channel`, `steps[<step>]` and `lists[<list id>]`, each an option id. The answer holds `channel` (the channel options), `steps` (each step an enabled parameter reads, with its options), `lists` (each list-sourced custom parameter, its list and options) and `fields` (the request field handles the parameters read). An option is its `id` and `label`. A step no enabled parameter reads is left out, an id that no longer exists is ignored, and a site with no lookup data gets an empty answer with a `200`.
-
-## Not available yet
-
-These parts of the tagged URL builder are tracked on [UAMS-Web/aether-redirects#26](https://github.com/UAMS-Web/aether-redirects/issues/26) and are not in a release:
-
-- **Saving a request's cascade choices** and issuing the URL from them at approval, tracked in [#119](https://github.com/UAMS-Web/aether-redirects/issues/119).
-- **The cascade fields on the request form** and the choices on the review screen, tracked in [#120](https://github.com/UAMS-Web/aether-redirects/issues/120).
-- **Whether a vanity URL request also carries a tagged URL** is an open scope question on #26, so nothing here describes it.
-- **Which request fields a custom parameter may read** is also open. Until it is decided, the fields a request saves are the three above.
-
-Until the choices are saved, the lists and parameters set up here take effect for the cascade endpoint and for any parameter whose value comes from a request field or a fixed value.
+Since v0.5.0, a signed-in user who may request a tagged URL can read the cascade as JSON, which the request form uses to narrow each list as choices are made. The route is `marketing-redirects.tagged-url.cascade`, and its query and answer are in [Control Panel routes](Control-Panel-routes.md#the-cascade-endpoint).
