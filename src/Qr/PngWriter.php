@@ -44,7 +44,8 @@ final class PngWriter implements QrWriter
             throw new RuntimeException('GD could not create the image.');
         }
 
-        // A fill from any pixel of a blank image spreads over all of it, so another starting point paints the same pixels.
+        // The start coordinate of the fill below: a fill from any pixel of a blank image spreads over all of it,
+        // so another starting point paints the same pixels.
         // @pest-mutate-ignore:IncrementInteger
         $start = 0;
 
