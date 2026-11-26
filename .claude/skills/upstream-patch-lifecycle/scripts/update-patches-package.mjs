@@ -240,7 +240,7 @@ export function update({ root, pkg, release, dryRun, manifest, deps = {} }) {
     } else if (registration.added.length + registration.updated.length + registration.conflicts.length === 0) {
         lines.push('  register: none missing from patches.json.')
     } else {
-        lines.push(`  register: ${registration.added.length} added, ${registration.updated.length} repointed, ${registration.conflicts.length} in conflict:`)
+        lines.push(`  register: ${registration.added.length} added, ${registration.updated.length} updated, ${registration.conflicts.length} in conflict:`)
         for (const patch of registration.added) {
             lines.push(`    + ${patch.file}  (patches ${patch.target})`)
         }
