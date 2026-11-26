@@ -181,7 +181,7 @@ and the session reports the reading and stops.
 
    ```bash
    gh api repos/UAMS-Web/$R/contents/.claude/sync-manifest.jsonc --jq .name
-   gh api repos/UAMS-Web/$R/pulls'?state=open&per_page=100' --jq '[.[] | select(.head.ref | startswith("sync/uams-claude-skills"))] | length'
+   gh api repos/UAMS-Web/$R/pulls'?state=open&per_page=100' --jq '[.[] | select(.head.ref | test("^sync/uams-claude-skills"))] | length'
    ```
 
    Not met: the first command fails with `404` (the add-on was never synced), or the second prints

@@ -28,7 +28,7 @@ description: >-
   Edit it there, not here; the next sync overwrites this copy.
   Delivered to this repository through the profile(s): php.
 -->
-<!-- cspell:ignore lockfiles Packagist retargeted -->
+<!-- cspell:ignore Packagist retargeted -->
 
 # Carry and retire a vendor Composer patch
 
@@ -273,7 +273,7 @@ directory). It does what steps 4 and 5 above do, in this order:
    package in `require` is applied from its own declaration, so nothing is registered.
    Entries of a target are keyed by description, so a declared description already in
    `patches.json` is handled by whose file it points at: a file of this package the release no
-   longer declares (a renamed file) is repointed in place; any other file (a patch the consumer
+   longer declares (a renamed file) has its entry updated in place; any other file (a patch the consumer
    carries under that description) is a **conflict**, and the script writes nothing, runs no
    command and exits 1, naming it. A `patches.json` that lists a target's patches as an array is
    refused (exit 2).
@@ -402,7 +402,7 @@ Writing a patch and documenting it moved to the `patch-package` skill, which the
 6. Name the gate that proves the patched tool works (see *Proving it worked*.
 7. `vendor/bin/pint --dirty`.
 
-### The relock, and when it is two lockfiles
+### The relock, and when it is two lock files
 
 `composer patches-relock` rewrites **`patches.lock.json`** (the per-patch SHA-256s and the set
 `_hash`). It does **not** touch **`composer.lock`**.
